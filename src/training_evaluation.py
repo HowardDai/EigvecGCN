@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch_geometric.utils import scatter
 
 import numpy as np
 import time
@@ -195,6 +196,105 @@ def evaluate_on_test(model, loader, device, config): # low frequency eigval eigv
         y_pred = model(features, adj)
         test_loss = criterion(y_pred[test_ind], labels[test_ind])
         test_acc = accuracy(y_pred[test_ind], labels[test_ind])
+
+def mse_test_loss(model, loader, device):
+    model.to(device)
+    model.eval()
+    loss = 0
+    for data in loader:
+        print(data.batch)
+        evecs_pred = model(data.x, data.edge_index, data.batch)
+        for i in range(data.num_graphs):
+            graph = data.get_example(i)
+            inds = torch.argwhere(data.batch == i)
+            _, evecs_gt = torch.linalg.eigh(graph.edge_index)
+            loss += torch.norm(evecs_pred[inds] - evecs_gt[:, :evecs_pred.shape[1]])
+    return loss
+
+def lap_reconstruction_loss(model, loader, adj, device):
+    model.to(device)
+    model.eval()
+    # adj: SparseTensor in COO format on CUDA
+    device = adj.device
+    N = adj.size(0)
+    # assert(False)
+    # 1) sum to get a dense degree vector
+    deg_vec = torch.sparse.sum(adj, dim=1).to_dense()      # [N]
+
+    # 2) build sparse diagonal: indices = [[0,1,2,…],[0,1,2,…]]
+    idx = torch.arange(N, device=device)
+    indices = torch.stack([idx, idx], dim=0)               # [2×N]
+    values  = deg_vec                                    # [N]
+
+    D = torch.sparse_coo_tensor(indices, values, (N, N),
+                                device=device)
+
+    # 3) sparse-sparse subtraction (yields a sparse result)
+    L = D - adj
+
+    loss = 0
+    for data in loader:
+        print(data.batch)
+        evecs_pred = model(data.x, data.edge_index, data.batch)
+        for i in range(data.num_graphs):
+            graph = data.get_example(i)
+            inds = torch.argwhere(data.batch == i)
+
+            U_pred = evecs_pred[inds]
+            lap = L[inds, inds]
+
+            lambda_gt, evecs_gt = torch.linalg.eigh(graph.edge_index)
+            lambda_pred = U_pred @ lap @ U_pred.T
+
+            U = evecs_gt[:, evecs_pred.shape[1]]
+            lambda_gt = lambda_gt[:evecs_pred.shape[1]]
+
+            low_rank_pred = U_pred @ torch.diag(lambda_pred) @ U_pred.T
+            low_rank_gt = U @ torch.diag(lambda_gt) @ U.T
+
+            loss += torch.norm(low_rank_pred - low_rank_gt)
+    return loss
+
+def eigenvalue_loss(model, loader, adj, device):
+    model.to(device)
+    model.eval()
+    # adj: SparseTensor in COO format on CUDA
+    device = adj.device
+    N = adj.size(0)
+    # assert(False)
+    # 1) sum to get a dense degree vector
+    deg_vec = torch.sparse.sum(adj, dim=1).to_dense()      # [N]
+
+    # 2) build sparse diagonal: indices = [[0,1,2,…],[0,1,2,…]]
+    idx = torch.arange(N, device=device)
+    indices = torch.stack([idx, idx], dim=0)               # [2×N]
+    values  = deg_vec                                    # [N]
+
+    D = torch.sparse_coo_tensor(indices, values, (N, N),
+                                device=device)
+
+    # 3) sparse-sparse subtraction (yields a sparse result)
+    L = D - adj
+
+    loss = 0
+    for data in loader:
+        print(data.batch)
+        evecs_pred = model(data.x, data.edge_index, data.batch)
+        for i in range(data.num_graphs):
+            graph = data.get_example(i)
+            inds = torch.argwhere(data.batch == i)
+
+            U_pred = evecs_pred[inds]
+            lap = L[inds, inds]
+
+            lambda_gt, evecs_gt = torch.linalg.eigh(graph.edge_index)
+            lambda_pred = U_pred @ lap @ U_pred.T
+
+            U = evecs_gt[:, evecs_pred.shape[1]]
+            lambda_gt = lambda_gt[:evecs_pred.shape[1]]
+
+            loss += torch.norm(U_pred @ U_pred.T @ lap @ U_pred @ U_pred.T - low_rank_gt)
+    return loss
 
     
 
