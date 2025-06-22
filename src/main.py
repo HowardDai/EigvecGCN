@@ -14,9 +14,9 @@ if __name__ == "__main__":
 
     dataset, train_loader, val_loader, test_loader = load_data(config)
 
-    
 
-    model = GCN(1, config.hidden_dim,
+
+    model = GCN(1, 
                 config.num_eigenvectors, config.dropout, config.use_bias)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,
@@ -27,7 +27,6 @@ if __name__ == "__main__":
     os.makedirs("checkpoints", exist_ok=True)
     
     training_loop(model, train_loader, val_loader, optimizer, device, config)
-
 
 
     # if not config.multiple_runs:

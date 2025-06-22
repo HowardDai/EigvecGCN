@@ -29,15 +29,20 @@ class GCNLayer(nn.Module):
 
 
 class GCN(nn.Module):
-    def __init__(self, node_features, hidden_dim, num_classes, dropout, use_bias=True):
+    def __init__(self, node_features, num_classes, dropout, use_bias=True):
         super(GCN, self).__init__()
-        self.gcn_1 = GCNLayer(node_features, hidden_dim, use_bias)
-        self.gcn_2 = GCNLayer(hidden_dim, num_classes, use_bias)
+        self.gcn_1 = GCNLayer(node_features, 16, use_bias)
+        self.gcn_2 = GCNLayer(16, 32, use_bias)
+        self.gcn_3 = GCNLayer(32, 64, use_bias)
+        self.gcn_4 = GCNLayer(64, num_classes, use_bias)
+
         self.dropout = nn.Dropout(p=dropout)
 
     def initialize_weights(self):
         self.gcn_1.initialize_weights()
         self.gcn_2.initialize_weights()
+        self.gcn_3.initialize_weights()
+        self.gcn_4.initialize_weights()
 
     
 
@@ -46,9 +51,15 @@ class GCN(nn.Module):
     def forward(self, x, adj, batch):
         x = F.relu(self.gcn_1(x, adj))
         x = self.dropout(x)
-        x = self.gcn_2(x, adj)
+        x = F.relu(self.gcn_2(x, adj))
+        x = self.dropout(x)
+        x = F.relu(self.gcn_3(x, adj))
+        x = self.dropout(x)
 
-    
+        x = self.gcn_4(x, adj)
+
+
+        # potential: forced orthogonalization via QR  
         x = normalize_by_batch(x, batch) # normalizing over each column 
 
         return x
