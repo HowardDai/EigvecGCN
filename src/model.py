@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from utils import normalize_by_batch
 
 
 class GCNLayer(nn.Module):
@@ -38,9 +39,21 @@ class GCN(nn.Module):
         self.gcn_1.initialize_weights()
         self.gcn_2.initialize_weights()
 
-    def forward(self, x, adj):
+    
+
+
+
+    def forward(self, x, adj, batch):
         x = F.relu(self.gcn_1(x, adj))
         x = self.dropout(x)
         x = self.gcn_2(x, adj)
-        x = F.normalize(x, dim=-2) # normalizing over each column 
+
+    
+        x = normalize_by_batch(x, batch) # normalizing over each column 
+
         return x
+
+    
+
+
+
