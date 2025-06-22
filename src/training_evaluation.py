@@ -45,7 +45,6 @@ def OrthogonalityLoss(eigvecs):
     """
     # 1) Gram matrix G [k × k]
     G = eigvecs.transpose(-2, -1) @ eigvecs    # shape (..., k, k)
-
     # 2) Identity of size k on the same device & dtype
     k = G.size(-1)
     I = torch.eye(k, device=G.device, dtype=G.dtype)
@@ -85,9 +84,12 @@ def train(model, loader, optimizer, device, config):
         optimizer.step()
         
 
-        total_loss += loss.item() * data.x.size(0)
-        total_energy_loss += energy_loss.item() * data.x.size(0) 
-        total_ortho_loss += ortho_loss.item() * data.x.size(0) 
+        batch_size = int(data.batch.max()) + 1
+        total_loss += loss.item()
+        total_energy_loss += energy_loss.item()
+        total_ortho_loss += ortho_loss.item()
+
+
 
     total_loss = total_loss / len(loader.dataset)
     total_energy_loss = total_energy_loss / len(loader.dataset)
@@ -110,9 +112,10 @@ def validate(model, loader, optimizer, device, config):
         ortho_loss = OrthogonalityLoss(out)
         loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
 
-        total_loss += loss.item() * data.x.size(0)
-        total_energy_loss += energy_loss.item() * data.x.size(0) 
-        total_ortho_loss += ortho_loss.item() * data.x.size(0) 
+        batch_size = int(data.batch.max()) + 1
+        total_loss += loss.item()
+        total_energy_loss += energy_loss.item() 
+        total_ortho_loss += ortho_loss.item() 
 
     total_loss = total_loss / len(loader.dataset)
     total_energy_loss = total_energy_loss / len(loader.dataset)

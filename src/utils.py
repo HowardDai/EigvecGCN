@@ -90,13 +90,13 @@ def convert_scipy_to_torch_sparse(matrix):
     return matrix
 
 
-def collate_fn(batch):
-    # batch is a list of tuple (graph, label)
-    graphs = [e[0] for e in batch]
-    g = dgl.batch(graphs)
-    labels = [e[1] for e in batch]
-    labels = torch.stack(labels, 0)
-    return g, labels
+# def collate_fn(batch):
+#     # batch is a list of tuple (graph, label)
+#     graphs = [e[0] for e in batch]
+#     g = dgl.batch(graphs)
+#     labels = [e[1] for e in batch]
+#     labels = torch.stack(labels, 0)
+#     return g, labels
 
 
 def load_data(config):
@@ -107,9 +107,9 @@ def load_data(config):
     split_idx = dataset.get_idx_split()
 
     
-    train_loader = DataLoader(dataset[split_idx['train']], batch_size=32, shuffle=True, collate_fn=collate_fn) # ISSUE: right now this is just concatenating everything in the batch, treating it lke a huge graph
-    val_loader   = DataLoader(dataset[split_idx['valid']], batch_size=64, shuffle=False, collate_fn=collate_fn)
-    test_loader  = DataLoader(dataset[split_idx['test']],  batch_size=64, shuffle=False, collate_fn=collate_fn)
+    train_loader = DataLoader(dataset[split_idx['train']], batch_size=32, shuffle=True) # ISSUE: right now this is just concatenating everything in the batch, treating it lke a huge graph
+    val_loader   = DataLoader(dataset[split_idx['valid']], batch_size=64, shuffle=False)
+    test_loader  = DataLoader(dataset[split_idx['test']],  batch_size=64, shuffle=False)
 
 
     return dataset, train_loader, val_loader, test_loader
