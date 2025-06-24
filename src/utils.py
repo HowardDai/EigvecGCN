@@ -21,6 +21,32 @@ from torch_geometric.loader import DataLoader
 import torch.nn.functional as F
 import torch.nn as nn
 
+def diffusion_transform(data: Data):
+    adj = data.edge_index
+    degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
+    diff_op = adj @ torch.inverse(degree)
+
+    u0 = torch.eye(adj.shape[0])
+    u2 = diff_op @ diff_op @ u0
+    u16 = u2
+    for i in range(14):
+        u16 = diff_op @ u2
+    return torch.stack((u0, u2, u16))
+
+def diffusion_convolution(U, data: Data):
+    h = []
+    for k in range(U.shape[0]):
+        h_k = U[k] @ data.edge_index
+        h.append(h_k)
+    h = tuple(h)
+    X = torch.cat(h, dim=1)
+    return X
+
+def padding(X, length=5000):
+    pad = (0, length - X.shape[1])
+    X = F.pad(X, pad)
+    return X
+
 
 def edge_index_to_sparse_adj(edge_index: torch.LongTensor, num_nodes: int) -> torch.Tensor:
     # edge_index: [2, E], num_nodes: N
@@ -40,7 +66,12 @@ def data_transforms(data: Data) -> Data:
     if data.x is None: # adding trivial features
         data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
     data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes) # converting to an adjacency matrix
-    
+
+    U = diffusion_transform(data)
+    X = diffusion_convolution(U, data)
+    X = padding(X)
+    data.x = X
+
     return data
 
 
@@ -135,7 +166,7 @@ def load_data(config):
     
     train_loader = DataLoader(dataset[split_idx['train']], batch_size=32, shuffle=True) # ISSUE: right now this is just concatenating everything in the batch, treating it lke a huge graph
     val_loader   = DataLoader(dataset[split_idx['valid']], batch_size=64, shuffle=False)
-    test_loader  = DataLoader(dataset[split_idx['test']],  batch_size=64, shuffle=False)
+    test_loader  = DataLoader(dataset[split_idx['test']],  batch_size=1, shuffle=False)
 
 
     return dataset, train_loader, val_loader, test_loader
