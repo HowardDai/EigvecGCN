@@ -70,13 +70,39 @@ def normalize_adjacency(adj):
     return adj
 
 def normalize_by_batch(x, batch):
-        num_groups = int(batch.max()) + 1
-        norm_sq = x.new_zeros(num_groups, x.shape[-1]).index_add(0, batch, x.pow(2))
-        norms  = norm_sq.sqrt()
-        x_norm = x / norms[batch]
+    num_groups = int(batch.max()) + 1
+    norm_sq = x.new_zeros(num_groups, x.shape[-1]).index_add(0, batch, x.pow(2))
+    norms  = norm_sq.sqrt()
+    x_norm = x / norms[batch]
 
-        return x_norm
+    return x_norm
 
+
+def orthogonalize_by_batch(x, batch):
+    """
+    Orthonormalize the set of vectors in each batch group.
+    
+    x:     (m, k) tensor, where m = num_groups * 30
+           each row is one k-dimensional vector
+    batch: (m,) long tensor with values in {0,…,num_groups-1},
+           exactly 30 rows per group
+    returns: x_orth of same shape, where for each g,
+             the 30 rows x[batch==g] are replaced by an
+             orthonormal set in R^k.
+    """
+    num_groups = int(batch.max().item()) + 1
+    x_orth = torch.empty_like(x)
+
+    for g in range(num_groups):
+        mask = (batch == g)
+        Xg = x[mask]              # shape (30, k)
+        # QR on the transpose → Q has shape (k, 30) with orthonormal columns
+        Q, R = torch.linalg.qr(Xg)
+        Xg_orth = Q            
+        x_orth[mask] = Xg_orth
+    
+    return x_orth
+ 
 
 def convert_scipy_to_torch_sparse(matrix):
     matrix_helper_coo = matrix.tocoo().astype('float32')

@@ -1,4 +1,8 @@
-from model import GCN
+import sys
+sys.path.append("models/")
+from mlp import MLP
+from GCN import GCN
+from GIN import GIN
 
 from utils import *
 from globals import config
@@ -14,15 +18,16 @@ if __name__ == "__main__":
 
     dataset, train_loader, val_loader, test_loader = load_data(config)
 
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+    # model = GCN(1, config.num_eigenvectors, config.dropout, config.use_bias)
 
-    model = GCN(1, 
-                config.num_eigenvectors, config.dropout, config.use_bias)
+    model = GIN(8, 3, 1, 60, config.num_eigenvectors, 0.1, True, "Sum", device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,
                                  weight_decay=config.weight_decay)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    
                            
     os.makedirs("checkpoints", exist_ok=True)
     

@@ -48,7 +48,7 @@ class GCN(nn.Module):
 
 
 
-    def forward(self, x, adj, batch):
+    def forward(self, x, adj):
         x = F.relu(self.gcn_1(x, adj))
         x = self.dropout(x)
         x = F.relu(self.gcn_2(x, adj))
@@ -60,11 +60,14 @@ class GCN(nn.Module):
 
 
         # potential: forced orthogonalization via QR  
-        x = normalize_by_batch(x, batch) # normalizing over each column 
+
+        
+        # normalizing over each column 
 
         return x
 
     
+
 
 
 

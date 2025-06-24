@@ -7,6 +7,8 @@ import time
 
 from tqdm import tqdm
 
+from utils import normalize_by_batch, orthogonalize_by_batch
+
 
 def EnergyLoss(eigvecs, adj):
     # adj: SparseTensor in COO format on CUDA
@@ -73,7 +75,11 @@ def train(model, loader, optimizer, device, config):
         # print(data.x.shape)
         # print(data.edge_index.shape)
         # print(data.num_nodes)
-        out = model(data.x, data.edge_index, data.batch)
+        out = model(data.x, data.edge_index)
+        # print(out)
+        out = orthogonalize_by_batch(out, data.batch)
+        out = normalize_by_batch(out, data.batch)
+
 
         energy_loss = EnergyLoss(out, data.edge_index)
         ortho_loss = OrthogonalityLoss(out)
@@ -107,8 +113,10 @@ def validate(model, loader, optimizer, device, config):
     total_ortho_loss = 0
     for data in tqdm(loader):
         data = data.to(device)
-        out = model(data.x, data.edge_index, data.batch)
+        out = model(data.x, data.edge_index)
+        out = orthogonalize_by_batch(out, data.batch)
 
+        out = normalize_by_batch(out, data.batch)
         energy_loss = EnergyLoss(out, data.edge_index)
         ortho_loss = OrthogonalityLoss(out)
         loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
