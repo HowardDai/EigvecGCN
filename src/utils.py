@@ -37,15 +37,16 @@ def diffusion_convolution(U, data: Data):
     h = []
     for k in range(U.shape[0]):
         h_k = U[k] @ data.edge_index
-        h.append(h_k)
+        h.append(padding(h_k))
     h = tuple(h)
     X = torch.cat(h, dim=1)
+
     return X
 
-def padding(X, length=5000):
-    pad = (0, length - X.shape[1])
-    X = F.pad(X, pad)
-    return X
+def padding(h_k, length=1000):
+    pad = (0, length - h_k.shape[1])
+    h_k = F.pad(h_k, pad)
+    return h_k
 
 
 def edge_index_to_sparse_adj(edge_index: torch.LongTensor, num_nodes: int) -> torch.Tensor:
@@ -69,7 +70,6 @@ def data_transforms(data: Data) -> Data:
 
     U = diffusion_transform(data)
     X = diffusion_convolution(U, data)
-    X = padding(X)
     data.x = X
 
     return data

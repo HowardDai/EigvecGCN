@@ -22,7 +22,7 @@ if __name__ == "__main__":
 
     # model = GCN(1, config.num_eigenvectors, config.dropout, config.use_bias)
 
-    model = GIN(8, 3, 5000, 60, config.num_eigenvectors, 0.1, True, "Sum", device)
+    model = GIN(8, 3, 3000, 60, config.num_eigenvectors, 0.1, True, "Sum", device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,
                                  weight_decay=config.weight_decay)
