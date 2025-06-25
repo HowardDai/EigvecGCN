@@ -9,6 +9,8 @@ from tqdm import tqdm
 
 from utils import normalize_by_batch, orthogonalize_by_batch
 
+def SupervisedLoss(evecs_pred, evecs_gt):
+    return torch.norm(evecs_pred - evecs_gt)
 
 def EnergyLoss(eigvecs, adj):
     # adj: SparseTensor in COO format on CUDA
@@ -84,6 +86,10 @@ def train(model, loader, optimizer, device, config):
         energy_loss = EnergyLoss(out, data.edge_index)
         ortho_loss = OrthogonalityLoss(out)
         loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
+
+        if config.use_supervised:
+            loss = SupervisedLoss(out, data.y)
+        
         # print("energy", energy_loss)
         # print("ortho", ortho_loss)
         optimizer.zero_grad()
@@ -120,6 +126,9 @@ def validate(model, loader, optimizer, device, config):
         energy_loss = EnergyLoss(out, data.edge_index)
         ortho_loss = OrthogonalityLoss(out)
         loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
+
+        if config.use_supervised:
+            loss = SupervisedLoss(out, data.y)
 
         batch_size = int(data.batch.max()) + 1
         total_loss += loss.item()

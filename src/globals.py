@@ -25,4 +25,6 @@ parser.add_argument("--multiple_runs", type=bool, default=False)
 parser.add_argument("--num_of_runs", type=int, default=100)
 parser.add_argument("--follow_paper", type=bool, default=True)
 
+parser.add_argument("--use_supervised", type=bool, default=True)
+
 config = parser.parse_args()

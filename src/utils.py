@@ -63,6 +63,7 @@ def edge_index_to_sparse_adj(edge_index: torch.LongTensor, num_nodes: int) -> to
 
     return adj
 
+
 def data_transforms(data: Data) -> Data:
     if data.x is None: # adding trivial features
         data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
@@ -158,8 +159,27 @@ def convert_scipy_to_torch_sparse(matrix):
 
 def load_data(config):
 
-    # dataset and splits 
-    dataset = PygGraphPropPredDataset(root='data', name='ogbg-ppa', transform=data_transforms)
+    # dataset and splits
+    def supervised_transforms(data: Data) -> Data:
+        data = data_transforms(data)
+        adj = data.edge_index
+        degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
+        lap = degree - adj
+
+        _, evecs = torch.linalg.eigh(lap)
+        data.y = evecs[:, :config.num_eigenvectors]
+
+        return data
+    
+    transform = None
+
+    if config.use_supervised:
+        transform = supervised_transforms
+    else:
+        transform = data_transforms
+
+
+    dataset = PygGraphPropPredDataset(root='data', name='ogbg-ppa', transform=transform)
 
     split_idx = dataset.get_idx_split()
 
