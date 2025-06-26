@@ -253,6 +253,9 @@ class DataTransform:
         if self.config.scatter_emb:
             data.x = torch.cat((data.x, scattering_transform(data)), dim=-1)
 
+        if self.config.global_scatter_emb:
+            data.x = torch.cat((data.x, global_scattering_transform(data)), dim=-1)
+
         if data.x.shape[-1] == 0: # trivial embeddings, if no other embeddings
             data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
         log_cpu("Before eigvec")

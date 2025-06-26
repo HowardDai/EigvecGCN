@@ -31,9 +31,13 @@ parser.add_argument("--loss_function", type=str, choices=['energy', 'supervised_
 parser.add_argument("--diffusion_emb",action="store_true")
 
 parser.add_argument("--wavelet_emb",action="store_true")
-# Choose two nodes, dirac at the 
+# Choose two nodes, dirac at each, wavelets at varied powers 
 
 parser.add_argument("--scatter_emb",action="store_true")
+# Choose two nodes, dirac at each, scatter wavelets
+
+parser.add_argument("--global_scatter_emb",action="store_true")
+# for each node, dirac, scatter wavelets, and then global moment aggregation 
 
 
 parser.add_argument("--use_supervised", type=bool, default=True) # To be replaced 
