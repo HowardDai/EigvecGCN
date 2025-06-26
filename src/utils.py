@@ -258,14 +258,14 @@ class DataTransform:
 
         if data.x.shape[-1] == 0: # trivial embeddings, if no other embeddings
             data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
-        log_cpu("Before eigvec")
+        # log_cpu("Before eigvec")
         # print(data.x.shape)
         if self.config.use_supervised:
             # print("Using supervised, adding ground truth y labels")
             data.y = get_eigvecs(data.edge_index, self.config.num_eigenvectors)
 
         # gc.collect()
-        log_cpu("After eigvec")
+        # log_cpu("After eigvec")
 
     
         return data
