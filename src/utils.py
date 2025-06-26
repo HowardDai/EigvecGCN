@@ -191,10 +191,6 @@ def global_scattering_transform(data: Data, num_scales=3, lazy_parameter=0.5, nu
     U = torch.abs(filters[0])
     for i in range(1, len(filters)):
         U = torch.abs(U @ filters[i])
-    
-    
-
-    print(U.shape)
 
     m0 = torch.sum(torch.abs(U), dim=0)
     
