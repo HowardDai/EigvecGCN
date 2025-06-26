@@ -52,7 +52,7 @@ def padding(h_k, length=1000):
 
 from collections import deque
 
-def generate_wavelet_bank(data: Data, num_scales=3, lazy_parameter=0.5, abs_val = False):
+def generate_wavelet_bank(data: Data, num_scales=10, lazy_parameter=0.5, abs_val = False):
     adj = data.edge_index
     degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
     diff_op = adj @ torch.inverse(degree)
@@ -139,13 +139,13 @@ def find_diameter_endpoints(adj: torch.sparse_coo_tensor):
 # 1. Find the two "outermost" nodes
 # 2. For each of the two nodes, run wavelet transform with a starting signal as a dirac on that node, at variable scales
 # 3. 
-def wavelet_transform_positional(data: Data, num_scales=3, lazy_parameter=0.5):
+def wavelet_transform_positional(data: Data, num_scales=10, lazy_parameter=0.5):
 
     adj = data.edge_index
     n1, n2 = find_diameter_endpoints(adj)
     N = adj.size(0)
 
-    filters = generate_wavelet_bank(data, num_scales=3, lazy_parameter=0.5)
+    filters = generate_wavelet_bank(data, num_scales=10, lazy_parameter=0.5)
 
     embs1 = torch.zeros(N, num_scales)
     embs2 = torch.zeros(N, num_scales)
@@ -172,7 +172,7 @@ def get_eigvecs(adj, num_eigenvectors):
 ##Geometric Scattering
 
 
-def scattering_transform(data: Data, num_scales=3, lazy_parameter=0.5):
+def scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5):
     filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
         
     U = torch.abs(filters[0])
@@ -185,16 +185,14 @@ def scattering_transform(data: Data, num_scales=3, lazy_parameter=0.5):
 
     return embeddings
 
-def global_scattering_transform(data: Data, num_scales=3, lazy_parameter=0.5, num_moments=4):
+def global_scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, num_moments=4):
     filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
-    print(filters.shape)
     U = torch.abs(filters[0])
     for i in range(1, len(filters)):
         U = torch.abs(U @ filters[i])
     
     
 
-    #print(U.shape)
 
     m0 = torch.sum(torch.abs(U), dim=0)
     
@@ -236,7 +234,7 @@ def log_cpu(name=""):
     print(f"[{name}] RSS: {rss:.1f} MB")
 
 
-class DataTransform:
+class DataPreTransform:
     def __init__(self, config):
         self.config = config
 
@@ -248,23 +246,27 @@ class DataTransform:
         
         if self.config.diffusion_emb:
             U = diffusion_transform(data)
-            data.x = torch.cat((data.x, diffusion_convolution(U, data)), dim=-1)
+            data.diffusion_emb = diffusion_convolution(U, data)
+            # data.x = torch.cat((data.x, diffusion_convolution(U, data)), dim=-1)
 
         if self.config.wavelet_emb:
-            data.x = torch.cat((data.x, wavelet_transform_positional(data)), dim=-1)
-
+            # data.x = torch.cat((data.x, wavelet_transform_positional(data)), dim=-1)
+            data.wavelet_emb = wavelet_transform_positional(data)
         if self.config.scatter_emb:
-            data.x = torch.cat((data.x, scattering_transform(data)), dim=-1)
+            # data.x = torch.cat((data.x, scattering_transform(data)), dim=-1)
+            data.scatter_emb = scattering_transform(data)
 
         if self.config.global_scatter_emb:
-            data.x = torch.cat((data.x, global_scattering_transform(data)), dim=-1)
+            data.global_scatter_emb = global_scattering_transform(data) 
+            # data.x = torch.cat((data.x, global_scattering_transform(data)), dim=-1)
+
 
         if data.x.shape[-1] == 0: # trivial embeddings, if no other embeddings
             data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
         # log_cpu("Before eigvec")
         # print(data.x.shape)
         if self.config.use_supervised:
-            print("Using supervised, adding ground truth y labels")
+            # print("Using supervised, adding ground truth y labels")
             data.y = get_eigvecs(data.edge_index, self.config.num_eigenvectors)
 
         # gc.collect()
@@ -273,6 +275,35 @@ class DataTransform:
     
         return data
 
+
+class DataTransform:
+    def __init__(self, config):
+        self.config = config
+
+    def __call__(self, data: Data) -> Data:
+        # our heavy pre‐transform steps
+        # data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
+
+        data.x = torch.ones(data.num_nodes, 0, dtype=torch.float32)
+        
+        if self.config.diffusion_emb:
+            data.x = torch.cat((data.x, data.diffusion_emb), dim=-1)
+
+        if self.config.wavelet_emb:
+            data.x = torch.cat((data.x, data.wavelet_emb), dim=-1)
+
+        if self.config.scatter_emb:
+            data.x = torch.cat((data.x, data.scatter_emb), dim=-1)
+
+        if self.config.global_scatter_emb:
+            data.x = torch.cat((data.x, data.global_scatter_emb), dim=-1)
+
+
+        if data.x.shape[-1] == 0: # trivial embeddings, if no other embeddings
+            data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
+
+    
+        return data
 
 def enumerate_labels(labels):
     """ Converts the labels from the original
@@ -356,14 +387,16 @@ def load_data(config):
 
     
         
+    pre_transform = DataPreTransform(config)
     transform = DataTransform(config)
-
     
-    dataset = PygGraphPropPredDataset(root='data', name='ogbg-ppa', pre_transform=transform)
+    dataset = PygGraphPropPredDataset(root='data', name='ogbg-ppa', transform=transform, pre_transform=pre_transform)
+
+
 
     sample = dataset[0]
     out = global_scattering_transform(sample)
-    print(out.shape)
+    # print(out.shape)
 
     split_idx = dataset.get_idx_split()
 
