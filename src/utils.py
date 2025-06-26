@@ -185,7 +185,7 @@ def scattering_transform(data: Data, num_scales=3, lazy_parameter=0.5):
 
     return embeddings
 
-def global_scattering_transform(data: Data, num_scales=3, num_moments=4):
+def global_scattering_transform(data: Data, num_scales=3, lazy_parameter=0.5, num_moments=4):
     filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = True)
 
     U = filters[0]
