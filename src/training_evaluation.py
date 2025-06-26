@@ -154,9 +154,16 @@ def validate(model, loader, optimizer, device, config):
         ortho_loss = OrthogonalityLoss(out)
         loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
 
-        if config.use_supervised:
+        if config.loss_function == 'supervised_eigval':
+            loss = eigenvalue_loss()
+        if config.loss_function == 'supervised_mse':
             loss = SupervisedLoss(out, data.y)
+        elif config.loss_function == 'supervised_lap_reconstruction':
+            return 
+        elif config.loss_function == 'supervised_eigval':
+            return
 
+            
         batch_size = int(data.batch.max()) + 1
         total_loss += loss.item()
         total_energy_loss += energy_loss.item() 
