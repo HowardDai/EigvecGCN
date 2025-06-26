@@ -26,9 +26,18 @@ parser.add_argument("--num_of_runs", type=int, default=100)
 parser.add_argument("--follow_paper", type=bool, default=True)
 
 parser.add_argument("--loss_function", type=str, choices=['energy', 'supervised_eigval', 'supervised_lap_reconstruction', 'supervised_mse'], default='energy')
-parser.add_argument("--embedding_type", type=str, choices=['diffusion', 'wavelet', 'trivial', 'scatter'], default='trivial')
+# parser.add_argument("--embedding_type", type=str, choices=['diffusion', 'wavelet', 'trivial', 'scatter'], default='trivial')
+parser.add_argument("--diffusion_emb",action="store_true")
+
+parser.add_argument("--wavelet_emb",action="store_true")
+# Choose two nodes, dirac at the 
+
+parser.add_argument("--scatter_emb",action="store_true")
 
 
 parser.add_argument("--use_supervised", type=bool, default=True) # To be replaced 
+
+parser.add_argument("--checkpoint_folder", type=str, default="checkpoints")
+
 
 config = parser.parse_args()

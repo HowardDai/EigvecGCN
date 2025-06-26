@@ -204,6 +204,14 @@ def edge_index_to_sparse_adj(edge_index: torch.LongTensor, num_nodes: int) -> to
     return adj
 
 
+import gc, psutil, os
+
+def log_cpu(name=""):
+    # gc.collect()
+    rss = psutil.Process(os.getpid()).memory_info().rss / 1e6
+    print(f"[{name}] RSS: {rss:.1f} MB")
+
+
 class DataTransform:
     def __init__(self, config):
         self.config = config
@@ -212,28 +220,28 @@ class DataTransform:
         # our heavy pre‐transform steps
         data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
 
-        if self.config.embedding_type == 'trivial':
-            data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
-
-        elif self.config.embedding_type == 'diffusion':
-            U = diffusion_transform(data)
-            data.x = diffusion_convolution(U, data)
-
-        elif self.config.embedding_type == 'wavelet':
-            data.x = wavelet_transform_positional(data)
-
-        elif self.config.embedding_type == 'scatter':
-            data.x = scattering_transform(data)
-
-        else:
-            print("Invalid embedding type")
-            return 
+        data.x = torch.ones(data.num_nodes, 0, dtype=torch.float32)
         
+        if self.config.diffusion_emb:
+            U = diffusion_transform(data)
+            data.x = torch.cat((data.x, diffusion_convolution(U, data)), dim=-1)
+
+        if self.config.wavelet_emb:
+            data.x = torch.cat((data.x, wavelet_transform_positional(data)), dim=-1)
+
+        if self.config.scatter_emb:
+            data.x = torch.cat((data.x, scattering_transform(data)), dim=-1)
+
+        if data.x.shape[-1] == 0: # trivial embeddings, if no other embeddings
+            data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
+        log_cpu("Before eigvec")
+        # print(data.x.shape)
         if self.config.use_supervised:
             # print("Using supervised, adding ground truth y labels")
             data.y = get_eigvecs(data.edge_index, self.config.num_eigenvectors)
 
-        print(torch.cuda.memory_summary())
+        # gc.collect()
+        log_cpu("After eigvec")
 
     
         return data
@@ -308,6 +316,7 @@ def convert_scipy_to_torch_sparse(matrix):
     shape = torch.Size(matrix_helper_coo.shape)
     matrix = torch.sparse.FloatTensor(indices, data, shape)
     return matrix
+
 
 
 

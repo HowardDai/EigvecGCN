@@ -22,14 +22,18 @@ if __name__ == "__main__":
 
     # model = GCN(1, config.num_eigenvectors, config.dropout, config.use_bias)
 
-    model = GIN(8, 3, 6, 60, config.num_eigenvectors, 0.1, True, "Sum", device)
+    sample = dataset[0]
+
+    input_size = sample.x.shape[-1]
+
+    model = GIN(8, 3, input_size, 60, config.num_eigenvectors, 0.1, True, "Sum", device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,
                                  weight_decay=config.weight_decay)
 
     
-                           
-    os.makedirs("checkpoints", exist_ok=True)
+    
+    os.makedirs(config.checkpoint_folder, exist_ok=True)
     
     training_loop(model, train_loader, val_loader, optimizer, device, config)
 

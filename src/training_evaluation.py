@@ -198,7 +198,7 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
 
 
             if val_loss < best_val_loss:
-                torch.save(model, f"checkpoints/{epoch}.pt")
+                torch.save(model, f"{config.checkpoint_folder}/{epoch}.pt")
                 best_val_loss = val_loss
 
             if config.use_early_stopping:
