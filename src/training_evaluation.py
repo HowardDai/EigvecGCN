@@ -12,7 +12,8 @@ from utils import normalize_by_batch, orthogonalize_by_batch
 def SupervisedLoss(evecs_pred, evecs_gt):
     return torch.norm(evecs_pred - evecs_gt)
 
-def EnergyLoss(eigvecs, adj):
+
+def EnergyLoss(eigvecs, adj, weights=None):
     # adj: SparseTensor in COO format on CUDA
     device = adj.device
     N = adj.size(0)
@@ -34,9 +35,22 @@ def EnergyLoss(eigvecs, adj):
     # 4) if you want energy in dense form, densify L first
     
     # L_dense = L.to_dense()
-    energy = torch.sum(
-        eigvecs.transpose(-2, -1) @ L @ eigvecs
+    if weights == None:
+        weights = torch.ones_like(deg_vec)
+
+    # build diagonal of weights
+    idx = torch.arange(N, device=device)
+    indices = torch.stack([idx, idx], dim=0)               # [2×N]
+    values  = weights                                    # [N]
+
+    diag_weights = torch.sparse_coo_tensor(indices, values, (N, N),
+                                device=device)
+
+    energy = torch.trace(
+        eigvecs.transpose(-2, -1) @ L @ eigvecs @ diag_weights
     )
+
+
     # print(adj.size)
     # print("eigvecs", eigvecs.shape)
     # print("L", L_dense.shape)
@@ -87,9 +101,15 @@ def train(model, loader, optimizer, device, config):
         ortho_loss = OrthogonalityLoss(out)
         loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
 
-        if config.use_supervised:
+        if config.loss_function == 'supervised_eigval':
+            loss = eigenvalue_loss()
+        if config.loss_function == 'supervised_mse':
             loss = SupervisedLoss(out, data.y)
-        
+        elif config.loss_function == 'supervised_lap_reconstruction':
+            return 
+        elif config.loss_function == 'supervised_eigval':
+            return
+
         # print("energy", energy_loss)
         # print("ortho", ortho_loss)
         optimizer.zero_grad()
@@ -231,7 +251,7 @@ def mse_test_loss(model, loader, device):
             loss += torch.norm(evecs_pred[inds] - evecs_gt[:, :evecs_pred.shape[1]])
     return loss
 
-def lap_reconstruction_loss(model, loader, adj, device):
+def lap_reconstruction_loss(model, loader, adj, device): # REWRITE SO IT JUST TAKES ONE DATA OBJECT (the loading step should happen in a wrapper outside )
     model.to(device)
     model.eval()
     # adj: SparseTensor in COO format on CUDA

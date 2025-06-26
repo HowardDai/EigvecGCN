@@ -25,6 +25,10 @@ parser.add_argument("--multiple_runs", type=bool, default=False)
 parser.add_argument("--num_of_runs", type=int, default=100)
 parser.add_argument("--follow_paper", type=bool, default=True)
 
-parser.add_argument("--use_supervised", type=bool, default=True)
+parser.add_argument("--loss_function", type=str, choices=['energy', 'supervised_eigval', 'supervised_lap_reconstruction', 'supervised_mse'], default='energy')
+parser.add_argument("--embedding_type", type=str, choices=['diffusion', 'wavelet', 'trivial'], default='trivial')
+
+
+parser.add_argument("--use_supervised", type=bool, default=False) # To be replaced 
 
 config = parser.parse_args()

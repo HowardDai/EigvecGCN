@@ -48,6 +48,111 @@ def padding(h_k, length=1000):
     h_k = F.pad(h_k, pad)
     return h_k
 
+# FOR THE POSITIONAL WAVELET EMBEDDINGS 
+
+from collections import deque
+
+
+def farthest_node_sparse(adj: torch.sparse_coo_tensor, start: int):
+    """
+    adj: N×N sparse adjacency in COO form
+    start: starting node index
+    returns: (farthest_node, distance)
+    """
+    # make sure we’re in COO and coalesced
+    adj = adj.coalesce()
+    N = adj.size(0)
+    device = adj.device
+
+    # bit‐vectors on nodes
+    visited  = torch.zeros(N, dtype=torch.bool, device=device)
+    dist     = torch.full((N,), -1, dtype=torch.int64, device=device)
+    frontier = torch.zeros(N, dtype=torch.bool, device=device)
+
+    # initialize
+    visited[start]    = True
+    dist[start]       = 0
+    frontier[start]   = True
+    current_distance = 0
+
+    # BFS loop via sparse mm
+    while frontier.any():
+        # propagate to neighbors: adj @ frontier → float counts
+        neigh_counts = torch.sparse.mm(adj, frontier.unsqueeze(1).float()).squeeze(1)
+        # any nonzero → neighbor
+        neigh = neigh_counts > 0
+
+        # new frontier = those neighbors not yet visited
+        new_frontier = neigh & (~visited)
+        if not new_frontier.any():
+            break
+
+        current_distance += 1
+        dist[new_frontier] = current_distance
+        visited |= new_frontier
+        frontier = new_frontier
+
+    # pick the farthest
+    far_node = int(dist.argmax().item())
+    far_dist = int(dist.max().item())
+    return far_node, far_dist
+
+
+def find_diameter_endpoints(adj: torch.sparse_coo_tensor):
+    """
+    Returns (u1, u2) approximate diameter endpoints,
+    by doing 2 runs of farthest_node_sparse.
+    """
+    # start from node 0 (or any arbitrary node)
+    u1, _ = farthest_node_sparse(adj, start=0)
+    u2, _ = farthest_node_sparse(adj, start=u1)
+    return u1, u2
+# Given a graph, computes an pseudo-positional/harmonic embedding on the nodes by the following:
+# 1. Find the two "outermost" nodes
+# 2. For each of the two nodes, run wavelet transform with a starting signal as a dirac on that node, at variable scales
+# 3. 
+def wavelet_transform_positional(data: Data, num_scales=3, lazy_parameter=0.5):
+    
+    adj = data.edge_index
+    degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
+    diff_op = adj @ torch.inverse(degree)
+
+    N = adj.size(0)
+
+    lazy_diff_op = lazy_parameter * torch.eye(N) + (1-lazy_parameter) * diff_op
+
+    n1, n2 = find_diameter_endpoints(adj)
+
+
+    x1 = torch.zeros(N)
+    x1[n1] = 1
+    x2 = torch.zeros(N)
+    x2[n2] = 1
+
+    embs1 = torch.zeros(N, num_scales)
+    embs2 = torch.zeros(N, num_scales)
+
+    diff_op_1 = lazy_diff_op
+    diff_op_2 = None
+    for i in range(num_scales):
+        diff_op_2 = diff_op_1 @ diff_op_1 # iterative squaring
+        wavelet_filter = diff_op_2 - diff_op_1 
+
+        wavelet_transform_1 = wavelet_filter @ x1
+        wavelet_transform_2 = wavelet_filter @ x2
+
+        embs1[:, i] = wavelet_transform_1
+        embs2[:, i] = wavelet_transform_2
+
+        diff_op_1 = diff_op_2 
+
+    embs = torch.cat((embs1, embs2), dim=1)
+    return embs 
+
+
+
+
+
 
 def edge_index_to_sparse_adj(edge_index: torch.LongTensor, num_nodes: int) -> torch.Tensor:
     # edge_index: [2, E], num_nodes: N
@@ -65,15 +170,43 @@ def edge_index_to_sparse_adj(edge_index: torch.LongTensor, num_nodes: int) -> to
 
 
 def data_transforms(data: Data) -> Data:
-    if data.x is None: # adding trivial features
-        data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
+
+    
     data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes) # converting to an adjacency matrix
 
-    U = diffusion_transform(data)
-    X = diffusion_convolution(U, data)
-    data.x = X
-
+    if config.embedding_type == 'trivial':
+        data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
+    elif config.embedding_type == 'diffusion':
+        U = diffusion_transform(data)
+        X = diffusion_convolution(U, data)
+        data.x = X
+    elif config.embedding_type == 'wavelet':
+        data.x = wavelet_transform_positional(data)
     return data
+
+class DataTransform:
+    def __init__(self, config):
+        self.config = config
+
+    def __call__(self, data: Data) -> Data:
+        # your heavy pre‐transform steps
+        data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
+
+        if self.config.embedding_type == 'trivial':
+            data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
+
+        elif self.config.embedding_type == 'diffusion':
+            U = diffusion_transform(data)
+            data.x = diffusion_convolution(U, data)
+
+        elif self.config.embedding_type == 'wavelet':
+            data.x = wavelet_transform_positional(data)
+
+        else:
+            print("Invalid embedding type")
+            return 
+
+        return data
 
 
 def enumerate_labels(labels):
@@ -108,7 +241,6 @@ def normalize_by_batch(x, batch):
     x_norm = x / norms[batch]
 
     return x_norm
-
 
 def orthogonalize_by_batch(x, batch):
     """
@@ -176,10 +308,11 @@ def load_data(config):
     if config.use_supervised:
         transform = supervised_transforms
     else:
-        transform = data_transforms
+        
+        transform = DataTransform(config)
 
-
-    dataset = PygGraphPropPredDataset(root='data', name='ogbg-ppa', transform=transform)
+    
+    dataset = PygGraphPropPredDataset(root='data', name='ogbg-ppa', pre_transform=transform) 
 
     split_idx = dataset.get_idx_split()
 
