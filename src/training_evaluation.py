@@ -98,7 +98,8 @@ def train(model, loader, optimizer, device, config):
         # print(data.num_nodes)
         out = model(data.x, data.edge_index)
         # print(out)
-        out = orthogonalize_by_batch(out, data.batch)
+        if config.forced_ortho:
+            out = orthogonalize_by_batch(out, data.batch)
         out = normalize_by_batch(out, data.batch)
 
 
@@ -145,7 +146,8 @@ def validate(model, loader, optimizer, device, config):
     for data in tqdm(loader):
         data = data.to(device)
         out = model(data.x, data.edge_index)
-        out = orthogonalize_by_batch(out, data.batch)
+        if config.forced_ortho:
+            out = orthogonalize_by_batch(out, data.batch)
 
         out = normalize_by_batch(out, data.batch)
         energy_loss = EnergyLoss(out, data.edge_index)

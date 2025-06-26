@@ -40,7 +40,9 @@ parser.add_argument("--global_scatter_emb",action="store_true")
 # for each node, dirac, scatter wavelets, and then global moment aggregation 
 
 
-parser.add_argument("--use_supervised", type=bool, default=True) # To be replaced 
+parser.add_argument("--use_supervised", type=bool, default=True) 
+
+parser.add_argument("--forced_ortho", type=bool, default=True) 
 
 parser.add_argument("--checkpoint_folder", type=str, default="checkpoints")
 
