@@ -151,13 +151,21 @@ def wavelet_transform_positional(data: Data, num_scales=3, lazy_parameter=0.5):
 
 
 
+def get_eigvecs(adj, num_eigenvectors):
+    degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
+    lap = degree - adj
+
+    _, evecs = torch.linalg.eigh(lap)
+
+
+    return evecs[:, :num_eigenvectors]
 
 
 
 def edge_index_to_sparse_adj(edge_index: torch.LongTensor, num_nodes: int) -> torch.Tensor:
     # edge_index: [2, E], num_nodes: N
     row, col = edge_index
-    # if your graph is undirected, you may want to add the reverse edges here
+    # if our graph is undirected, you may want to add the reverse edges here
     # e.g. row = torch.cat([row, col]); col = torch.cat([col, row])
     values = torch.ones(row.size(0), dtype=torch.float32)
     adj = torch.sparse_coo_tensor(
@@ -169,27 +177,12 @@ def edge_index_to_sparse_adj(edge_index: torch.LongTensor, num_nodes: int) -> to
     return adj
 
 
-def data_transforms(data: Data) -> Data:
-
-    
-    data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes) # converting to an adjacency matrix
-
-    if config.embedding_type == 'trivial':
-        data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
-    elif config.embedding_type == 'diffusion':
-        U = diffusion_transform(data)
-        X = diffusion_convolution(U, data)
-        data.x = X
-    elif config.embedding_type == 'wavelet':
-        data.x = wavelet_transform_positional(data)
-    return data
-
 class DataTransform:
     def __init__(self, config):
         self.config = config
 
     def __call__(self, data: Data) -> Data:
-        # your heavy pre‐transform steps
+        # our heavy pre‐transform steps
         data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
 
         if self.config.embedding_type == 'trivial':
@@ -205,7 +198,14 @@ class DataTransform:
         else:
             print("Invalid embedding type")
             return 
+        
+        if self.config.use_supervised:
+            # print("Using supervised, adding ground truth y labels")
+            data.y = get_eigvecs(data.edge_index, self.config.num_eigenvectors)
 
+        print(torch.cuda.memory_summary())
+
+    
         return data
 
 
@@ -280,36 +280,17 @@ def convert_scipy_to_torch_sparse(matrix):
     return matrix
 
 
-# def collate_fn(batch):
-#     # batch is a list of tuple (graph, label)
-#     graphs = [e[0] for e in batch]
-#     g = dgl.batch(graphs)
-#     labels = [e[1] for e in batch]
-#     labels = torch.stack(labels, 0)
-#     return g, labels
-
 
 def load_data(config):
 
     # dataset and splits
-    def supervised_transforms(data: Data) -> Data:
-        data = data_transforms(data)
-        adj = data.edge_index
-        degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
-        lap = degree - adj
-
-        _, evecs = torch.linalg.eigh(lap)
-        data.y = evecs[:, :config.num_eigenvectors]
-
-        return data
+    
     
     transform = None
 
-    if config.use_supervised:
-        transform = supervised_transforms
-    else:
+    
         
-        transform = DataTransform(config)
+    transform = DataTransform(config)
 
     
     dataset = PygGraphPropPredDataset(root='data', name='ogbg-ppa', pre_transform=transform) 

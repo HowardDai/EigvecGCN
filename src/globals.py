@@ -29,6 +29,6 @@ parser.add_argument("--loss_function", type=str, choices=['energy', 'supervised_
 parser.add_argument("--embedding_type", type=str, choices=['diffusion', 'wavelet', 'trivial'], default='trivial')
 
 
-parser.add_argument("--use_supervised", type=bool, default=False) # To be replaced 
+parser.add_argument("--use_supervised", type=bool, default=True) # To be replaced 
 
 config = parser.parse_args()
