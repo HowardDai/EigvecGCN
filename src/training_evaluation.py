@@ -35,13 +35,18 @@ def EnergyLoss(eigvecs, adj, weights=None):
     # 4) if you want energy in dense form, densify L first
     
     # L_dense = L.to_dense()
+    
+
+    num_eigenvectors = eigvecs.shape[-1]
+
     if weights == None:
-        weights = torch.ones_like(deg_vec)
+        weights = torch.ones(num_eigenvectors)
+
 
     # build diagonal of weights
     idx = torch.arange(num_eigenvectors, device=device)
-    indices = torch.stack([idx, idx], dim=0)               # [2×N]
-    values  = weights                                    # [N]
+    indices = torch.stack([idx, idx], dim=0)               # [2×num_eigs]
+    values  = weights                                    # [num_eigs]
 
     diag_weights = torch.sparse_coo_tensor(indices, values, (num_eigenvectors, num_eigenvectors),
                                 device=device)
