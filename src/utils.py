@@ -52,6 +52,33 @@ def padding(h_k, length=1000):
 
 from collections import deque
 
+def generate_wavelet_bank(data: Data, num_scales=3, lazy_parameter=0.5, abs_val = False):
+    adj = data.edge_index
+    degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
+    diff_op = adj @ torch.inverse(degree)
+
+    N = adj.size(0)
+
+    lazy_diff_op = lazy_parameter * torch.eye(N) + (1-lazy_parameter) * diff_op
+
+    diff_op_1 = lazy_diff_op
+    diff_op_2 = None
+
+    filters = ()
+
+    for i in range(num_scales):
+        diff_op_2 = diff_op_1 @ diff_op_1 # iterative squaring
+        wavelet_filter = diff_op_2 - diff_op_1 
+
+        if abs_val:
+            wavelet_filter = torch.abs(wavelet_filter)
+
+        filters = filters + (wavelet_filter,)
+
+        diff_op_1 = diff_op_2 
+
+    return filters
+
 
 def farthest_node_sparse(adj: torch.sparse_coo_tensor, start: int):
     """
@@ -107,44 +134,26 @@ def find_diameter_endpoints(adj: torch.sparse_coo_tensor):
     u1, _ = farthest_node_sparse(adj, start=0)
     u2, _ = farthest_node_sparse(adj, start=u1)
     return u1, u2
+
 # Given a graph, computes an pseudo-positional/harmonic embedding on the nodes by the following:
 # 1. Find the two "outermost" nodes
 # 2. For each of the two nodes, run wavelet transform with a starting signal as a dirac on that node, at variable scales
 # 3. 
 def wavelet_transform_positional(data: Data, num_scales=3, lazy_parameter=0.5):
-    
-    adj = data.edge_index
-    degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
-    diff_op = adj @ torch.inverse(degree)
 
+    adj = data.edge_index
+    n1, n2 = find_diameter_endpoints(adj)
     N = adj.size(0)
 
-    lazy_diff_op = lazy_parameter * torch.eye(N) + (1-lazy_parameter) * diff_op
-
-    n1, n2 = find_diameter_endpoints(adj)
-
-
-    x1 = torch.zeros(N)
-    x1[n1] = 1
-    x2 = torch.zeros(N)
-    x2[n2] = 1
+    filters = generate_wavelet_bank(data, num_scales=3, lazy_parameter=0.5)
 
     embs1 = torch.zeros(N, num_scales)
     embs2 = torch.zeros(N, num_scales)
 
-    diff_op_1 = lazy_diff_op
-    diff_op_2 = None
     for i in range(num_scales):
-        diff_op_2 = diff_op_1 @ diff_op_1 # iterative squaring
-        wavelet_filter = diff_op_2 - diff_op_1 
 
-        wavelet_transform_1 = wavelet_filter @ x1
-        wavelet_transform_2 = wavelet_filter @ x2
-
-        embs1[:, i] = wavelet_transform_1
-        embs2[:, i] = wavelet_transform_2
-
-        diff_op_1 = diff_op_2 
+        embs1[:, i] = filters[i][:, n1]
+        embs2[:, i] = filters[i][:, n2]
 
     embs = torch.cat((embs1, embs2), dim=1)
     return embs 
@@ -160,6 +169,24 @@ def get_eigvecs(adj, num_eigenvectors):
 
     return evecs[:, :num_eigenvectors]
 
+##Geometric Scattering
+
+
+def scattering_transform(data: Data, num_scales=3, lazy_parameter=0.5):
+    filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = True)
+        
+    U = filters[0]
+    for i in range(1, len(filters)):
+        U = U @ filters[i]
+
+    nodes = list(find_diameter_endpoints(data.edge_index))
+
+    embeddings = U[:, nodes]
+
+    return embeddings
+        
+
+        
 
 
 def edge_index_to_sparse_adj(edge_index: torch.LongTensor, num_nodes: int) -> torch.Tensor:
@@ -194,6 +221,9 @@ class DataTransform:
 
         elif self.config.embedding_type == 'wavelet':
             data.x = wavelet_transform_positional(data)
+
+        elif self.config.embedding_type == 'scatter':
+            data.x = scattering_transform(data)
 
         else:
             print("Invalid embedding type")
