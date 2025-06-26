@@ -20,9 +20,15 @@ if __name__ == "__main__":
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # model = GCN(1, config.num_eigenvectors, config.dropout, config.use_bias)
-
-    model = GIN(8, 3, 6, 60, config.num_eigenvectors, 0.1, True, "Sum", device)
+    if config.model == 'GCN':
+        model = GCN(dataset.x.shape[1], config.num_eigenvectors, config.dropout, config.use_bias)
+    elif config.model == "GIN":
+        model = GIN(8, 3, dataset.x.shape[1], 60, config.num_eigenvectors, 0.1, True, "Sum", device)
+    elif config.model == "MLP":
+        model = MLP(8, dataset.x.shape[1], 60, config.num_eigenvectors)
+    else:
+        print("Invalid model type")
+            return
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,
                                  weight_decay=config.weight_decay)
