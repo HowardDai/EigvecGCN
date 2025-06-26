@@ -5,7 +5,7 @@ use_cuda = torch.cuda.is_available()
 
 parser = ArgumentParser()
 # parser.add_argument("--cuda", type=bool, default=use_cuda)
-parser.add_argument("--model", type=str, choices=["GCN", 'GIN', 'MLP'])
+parser.add_argument("--model", type=str, choices=["GCN", 'GIN', 'MLP'], default='GCN')
 
 parser.add_argument("--hidden_dim", type=int, default=16)
 parser.add_argument("--dropout", type=float, default=0.5)

@@ -28,8 +28,7 @@ if __name__ == "__main__":
         model = MLP(8, dataset.x.shape[1], 60, config.num_eigenvectors)
     else:
         print("Invalid model type")
-            return
-
+        
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,
                                  weight_decay=config.weight_decay)
 
