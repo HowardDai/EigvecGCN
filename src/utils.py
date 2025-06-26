@@ -173,11 +173,11 @@ def get_eigvecs(adj, num_eigenvectors):
 
 
 def scattering_transform(data: Data, num_scales=3, lazy_parameter=0.5):
-    filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = True)
+    filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
         
-    U = filters[0]
+    U = torch.abs(filters[0])
     for i in range(1, len(filters)):
-        U = U @ filters[i]
+        U = torch.abs(U @ filters[i])
 
     nodes = list(find_diameter_endpoints(data.edge_index))
 
@@ -186,20 +186,23 @@ def scattering_transform(data: Data, num_scales=3, lazy_parameter=0.5):
     return embeddings
 
 def global_scattering_transform(data: Data, num_scales=3, lazy_parameter=0.5, num_moments=4):
-    filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = True)
+    filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
 
-    U = filters[0]
+    U = torch.abs(filters[0])
     for i in range(1, len(filters)):
-        U = U @ filters[i]
+        U = torch.abs(U @ filters[i])
     
-    Ux = U @ data.x
+    
 
-    m0 = torch.sum(torch.abs(Ux), dim=0)
+    print(U.shape)
+
+    m0 = torch.sum(torch.abs(U), dim=0)
     
-    moments = m0
+    moments = torch.unsqueeze(m0, 1)
 
     for i in range(1, num_moments):
-        m_i = torch.sum((Ux)**(i+1), dim =0)
+        m_i = torch.sum(U**(i+1), dim =0)
+        m_i = torch.unsqueeze(m_i, 1)
         moments = torch.cat((moments, m_i), dim=1)
     
     return moments
@@ -356,7 +359,7 @@ def load_data(config):
     transform = DataTransform(config)
 
     
-    dataset = PygGraphPropPredDataset(root='data', name='ogbg-ppa', pre_transform=transform) 
+    dataset = PygGraphPropPredDataset(root='data', name='ogbg-ppa', pre_transform=transform)
 
     split_idx = dataset.get_idx_split()
 
