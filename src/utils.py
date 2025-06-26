@@ -187,14 +187,14 @@ def scattering_transform(data: Data, num_scales=3, lazy_parameter=0.5):
 
 def global_scattering_transform(data: Data, num_scales=3, lazy_parameter=0.5, num_moments=4):
     filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
-
+    print(filters.shape)
     U = torch.abs(filters[0])
     for i in range(1, len(filters)):
         U = torch.abs(U @ filters[i])
     
     
 
-    print(U.shape)
+    #print(U.shape)
 
     m0 = torch.sum(torch.abs(U), dim=0)
     
@@ -264,7 +264,7 @@ class DataTransform:
         # log_cpu("Before eigvec")
         # print(data.x.shape)
         if self.config.use_supervised:
-            # print("Using supervised, adding ground truth y labels")
+            print("Using supervised, adding ground truth y labels")
             data.y = get_eigvecs(data.edge_index, self.config.num_eigenvectors)
 
         # gc.collect()
@@ -360,6 +360,10 @@ def load_data(config):
 
     
     dataset = PygGraphPropPredDataset(root='data', name='ogbg-ppa', pre_transform=transform)
+
+    sample = dataset[0]
+    out = global_scattering_transform(sample)
+    print(out.shape)
 
     split_idx = dataset.get_idx_split()
 
