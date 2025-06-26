@@ -39,11 +39,11 @@ def EnergyLoss(eigvecs, adj, weights=None):
         weights = torch.ones_like(deg_vec)
 
     # build diagonal of weights
-    idx = torch.arange(N, device=device)
+    idx = torch.arange(num_eigenvectors, device=device)
     indices = torch.stack([idx, idx], dim=0)               # [2×N]
     values  = weights                                    # [N]
 
-    diag_weights = torch.sparse_coo_tensor(indices, values, (N, N),
+    diag_weights = torch.sparse_coo_tensor(indices, values, (num_eigenvectors, num_eigenvectors),
                                 device=device)
 
     energy = torch.trace(
