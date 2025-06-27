@@ -21,6 +21,8 @@ from torch_geometric.loader import DataLoader
 import torch.nn.functional as F
 import torch.nn as nn
 
+from tqdm import tqdm
+
 def diffusion_transform(data: Data):
     adj = data.edge_index
     degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
@@ -52,32 +54,7 @@ def padding(h_k, length=1000):
 
 from collections import deque
 
-def generate_wavelet_bank(data: Data, num_scales=10, lazy_parameter=0.5, abs_val = False):
-    adj = data.edge_index
-    degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
-    diff_op = adj @ torch.inverse(degree)
 
-    N = adj.size(0)
-
-    lazy_diff_op = lazy_parameter * torch.eye(N) + (1-lazy_parameter) * diff_op
-
-    diff_op_1 = lazy_diff_op
-    diff_op_2 = None
-
-    filters = ()
-
-    for i in range(num_scales):
-        diff_op_2 = diff_op_1 @ diff_op_1 # iterative squaring
-        wavelet_filter = diff_op_2 - diff_op_1 
-
-        if abs_val:
-            wavelet_filter = torch.abs(wavelet_filter)
-
-        filters = filters + (wavelet_filter,)
-
-        diff_op_1 = diff_op_2 
-
-    return filters
 
 
 def farthest_node_sparse(adj: torch.sparse_coo_tensor, start: int):
@@ -135,6 +112,38 @@ def find_diameter_endpoints(adj: torch.sparse_coo_tensor):
     u2, _ = farthest_node_sparse(adj, start=u1)
     return u1, u2
 
+def degree_node_selection(adj: torch.sparse_coo_tensor, k, largest=True):
+    degrees = torch.sum(adj.to_dense(), dim = 0)
+    _, indices = degrees.topk(k, largest=largest)
+    return indices
+
+def generate_wavelet_bank(data: Data, num_scales=10, lazy_parameter=0.5, abs_val = False):
+    adj = data.edge_index
+    degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
+    diff_op = adj @ torch.inverse(degree)
+
+    N = adj.size(0)
+
+    lazy_diff_op = lazy_parameter * torch.eye(N) + (1-lazy_parameter) * diff_op
+
+    diff_op_1 = lazy_diff_op
+    diff_op_2 = None
+
+    filters = ()
+
+    for i in range(num_scales):
+        diff_op_2 = diff_op_1 @ diff_op_1 # iterative squaring
+        wavelet_filter = diff_op_1  - diff_op_2 
+
+        if abs_val:
+            wavelet_filter = torch.abs(wavelet_filter)
+
+        filters = filters + (wavelet_filter,)
+
+        diff_op_1 = diff_op_2 
+
+    return filters
+
 
 # Given a graph, computes an pseudo-positional/harmonic embedding on the nodes by the following:
 # 1. Find the two "outermost" nodes
@@ -161,24 +170,55 @@ def wavelet_transform_positional(data: Data, num_scales=10, lazy_parameter=0.5):
 
 
 
-def get_eigvecs(adj, num_eigenvectors):
-    degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
-    lap = degree - adj
+def get_padded_eigvecs(adj: torch.Tensor, max_graph_size: int = 300):
+    """
+    Compute eigenvalues/eigenvectors of Laplacian(adj), then
+    pad both to size `max_graph_size` with zeros (or trim if larger).
+    
+    Returns:
+      evals:  Tensor of shape (max_graph_size,)
+      evecs: Tensor of shape (max_graph_size, max_graph_size)
+    """
+    # Build Laplacian
+    lap = get_lap(adj)
 
-    _, evecs = torch.linalg.eigh(lap)
+    # Full spectrum
+    evals, evecs = torch.linalg.eigh(lap)      # shapes (n,), (n, n)
+    n = evals.size(0)
 
+    # If graph bigger, truncate
+    if n > max_graph_size:
+        evals = evals[:max_graph_size]
+        evecs = evecs[:max_graph_size, :max_graph_size]
+        return evals, evecs
 
-    return evecs[:, :num_eigenvectors]
+    # Otherwise, pad up to max_graph_size
+    pad_len = max_graph_size - n
+
+    # 1) pad evals: concatenate zeros
+    pad_evals = torch.zeros(pad_len, device=evals.device, dtype=evals.dtype)
+    evals_padded = torch.cat([evals, pad_evals], dim=0)  # shape = (max_graph_size,)
+
+    # 2) pad evecs: add zero‐rows and zero‐columns
+    #    F.pad takes (pad_left, pad_right, pad_top, pad_bottom)
+    evecs_padded = F.pad(evecs,
+                        # columns: (left, right) = (0, pad_len)
+                        # rows   : (top, bottom) = (0, pad_len)
+                        pad=(0, pad_len, 0, pad_len),
+                        mode='constant', value=0.0)
+    # now shape = (n+pad_len, n+pad_len) = (max_graph_size, max_graph_size)
+
+    return evals_padded, evecs_padded
+
 
 ##Geometric Scattering
 
 
-def scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5):
+def scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, wavelet_inds=[]):
     filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
     
     if len(wavelet_inds) != 0:
-        if max(wavelet_inds < len(filters)):
-            filters = filters[wavelet_inds]
+        filters = [filters[i] for i in wavelet_inds]
     U = torch.abs(filters[0])
     for i in range(1, len(filters)):
         U = torch.abs(U @ filters[i])
@@ -189,12 +229,12 @@ def scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5):
 
     return embeddings
 
-def global_scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, num_moments=4, wavelet_inds=[]):
+def global_scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, num_moments=5, wavelet_inds=[]):
     filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
 
     if len(wavelet_inds) != 0:
-        if max(wavelet_inds < len(filters)):
-            filters = filters[wavelet_inds]
+        
+        filters = [filters[i] for i in wavelet_inds]
 
     U = torch.abs(filters[0])
     for i in range(1, len(filters)):
@@ -236,6 +276,7 @@ def edge_index_to_sparse_adj(edge_index: torch.LongTensor, num_nodes: int) -> to
 
 
 import gc, psutil, os
+from custom import *
 
 def log_cpu(name=""):
     # gc.collect()
@@ -243,16 +284,27 @@ def log_cpu(name=""):
     print(f"[{name}] RSS: {rss:.1f} MB")
 
 
-class DataPreTransform:
+def get_lap(adj):
+    degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
+    lap = degree - adj
+    return lap
+
+
+def pre_transform(data):  # computes eigvecs eigvals and reformats edge_index
+    data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
+    evals, evecs = get_padded_eigvecs(data.edge_index)
+    data.eigvecs = evecs 
+    data.eigvals = evals
+ 
+    return data
+
+class DataEmbeddings:
     def __init__(self, config):
         self.config = config
 
     def __call__(self, data: Data) -> Data:
-        # our heavy pre‐transform steps
-        data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
+        # BUILDING EMBEDDINGS
 
-        data.x = torch.ones(data.num_nodes, 0, dtype=torch.float32)
-        
         if self.config.diffusion_emb:
             U = diffusion_transform(data)
             data.diffusion_emb = diffusion_convolution(U, data)
@@ -263,38 +315,24 @@ class DataPreTransform:
             data.wavelet_emb = wavelet_transform_positional(data)
         if self.config.scatter_emb:
             # data.x = torch.cat((data.x, scattering_transform(data)), dim=-1)
-            data.scatter_emb = scattering_transform(data)
+            wavelet_paths = custom_wavelet_choices()
+            data.scatter_emb = torch.zeros(data.num_nodes, 0, dtype=torch.float32)
+            for i in range(len(wavelet_paths)):
+                data.scatter_emb = torch.cat((data.scatter_emb, scattering_transform(data,wavelet_inds = wavelet_paths[i])), dim=-1)
 
         if self.config.global_scatter_emb:
-            data.global_scatter_emb = global_scattering_transform(data) 
+            wavelet_paths = custom_wavelet_choices()
+            data.global_scatter_emb = torch.zeros(data.num_nodes, 0, dtype=torch.float32)
+            for i in range(len(wavelet_paths)):
+                data.global_scatter_emb = torch.cat((data.scatter_emb, global_scattering_transform(data,wavelet_inds = wavelet_paths[i])), dim=-1)
+
             # data.x = torch.cat((data.x, global_scattering_transform(data)), dim=-1)
 
 
-        if data.x.shape[-1] == 0: # trivial embeddings, if no other embeddings
-            data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
-        # log_cpu("Before eigvec")
-        # print(data.x.shape)
-        if self.config.use_supervised:
-            # print("Using supervised, adding ground truth y labels")
-            data.y = get_eigvecs(data.edge_index, self.config.num_eigenvectors)
-
-        # gc.collect()
-        # log_cpu("After eigvec")
-
-    
-        return data
-
-
-class DataTransform:
-    def __init__(self, config):
-        self.config = config
-
-    def __call__(self, data: Data) -> Data:
-        # our heavy pre‐transform steps
-        # data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
-
+        # CONCATENATING THE EMBEDDINGS 
         data.x = torch.ones(data.num_nodes, 0, dtype=torch.float32)
-        
+
+
         if self.config.diffusion_emb:
             data.x = torch.cat((data.x, data.diffusion_emb), dim=-1)
 
@@ -310,8 +348,17 @@ class DataTransform:
 
         if data.x.shape[-1] == 0: # trivial embeddings, if no other embeddings
             data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
-
     
+        return data
+
+
+class DataTransform:
+    def __init__(self, config):
+        self.config = config
+
+    def __call__(self, data: Data) -> Data:
+        # data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
+
         return data
 
 def enumerate_labels(labels):
@@ -392,20 +439,24 @@ def load_data(config):
     # dataset and splits
     
     
-    transform = None
 
     
         
-    pre_transform = DataPreTransform(config)
+    # pre_transform = DataPreTransform(config)
     transform = DataTransform(config)
+    embeddings = DataEmbeddings(config)
     
     dataset = PygGraphPropPredDataset(root='data', name='ogbg-ppa', transform=transform, pre_transform=pre_transform)
 
-
-
+    for data in tqdm(dataset): # apply embeddings to dataset first 
+        data = embeddings(data)
+    
     sample = dataset[0]
-    out = global_scattering_transform(sample)
-    # print(out.shape)
+    print(sample.wavelet_emb.shape)
+    print(sample.scatter_emb.shape)
+    print(sample.global_scatter_emb.shape)
+    # out = global_scattering_transform(sample)
+    # # print(out.shape)
 
     split_idx = dataset.get_idx_split()
 
