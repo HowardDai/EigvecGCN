@@ -356,7 +356,8 @@ class DataTransform:
 
     def __call__(self, data: Data) -> Data:
         # data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
-
+        embeddings = DataEmbeddings(config)
+        data = data(embeddings)
         return data
 
 def enumerate_labels(labels):
@@ -446,15 +447,7 @@ def load_data(config):
     
     dataset = PygGraphPropPredDataset(root='data', name='ogbg-ppa', transform=transform, pre_transform=pre_transform)
 
-    for data in tqdm(dataset): # apply embeddings to dataset first 
-        data = embeddings(data)
-    
-    sample = dataset[0]
-    print(sample.wavelet_emb.shape)
-    print(sample.scatter_emb.shape)
-    print(sample.global_scatter_emb.shape)
-    # out = global_scattering_transform(sample)
-    # # print(out.shape)
+
 
     split_idx = dataset.get_idx_split()
 
