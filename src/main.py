@@ -22,9 +22,9 @@ if __name__ == "__main__":
 
     # model = GCN(1, config.num_eigenvectors, config.dropout, config.use_bias)
 
-    sample = dataset[0]
-
+    sample = dataset[0] 
     input_size = sample.x.shape[-1]
+    print("input_size", input_size)
 
     if config.model == 'GCN':
         model = GCN(input_size, config.num_eigenvectors, config.dropout, config.use_bias)

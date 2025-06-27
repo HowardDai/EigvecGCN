@@ -155,6 +155,7 @@ def wavelet_transform_positional(data: Data, num_scales=10, lazy_parameter=0.5, 
 
     adj = data.edge_index
     nodes = list(find_diameter_endpoints(adj)) + list(degree_node_selection(adj, k, largest=True))
+    num_selected_nodes = len(nodes)
     N = adj.size(0)
 
     filters = generate_wavelet_bank(data, num_scales=10, lazy_parameter=0.5)
@@ -162,7 +163,7 @@ def wavelet_transform_positional(data: Data, num_scales=10, lazy_parameter=0.5, 
     embs = torch.zeros(N, num_scales * (k + 2))
 
     for i in range(num_scales):
-        embs[:, i * nodes:(i+1)*nodes] = filters[i][:, nodes]
+        embs[:, i * num_selected_nodes:(i+1)*num_selected_nodes] = filters[i][:, nodes]
 
     return embs 
 
@@ -213,7 +214,7 @@ def get_padded_eigvecs(adj: torch.Tensor, max_graph_size: int = 300):
 
 
 def scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, wavelet_inds=[]):
-    filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False, k=2)
+    filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
     
     if len(wavelet_inds) != 0:
         filters = [filters[i] for i in wavelet_inds]
@@ -221,7 +222,7 @@ def scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, wavelet_
     for i in range(1, len(filters)):
         U = torch.abs(U @ filters[i])
 
-    nodes = list(find_diameter_endpoints(data.edge_index)) + list(degree_node_selection(adj, k, largest=True))
+    nodes = list(find_diameter_endpoints(data.edge_index)) + list(degree_node_selection(data.edge_index, 2, largest=True))
 
     embeddings = U[:, nodes]
 
@@ -356,8 +357,8 @@ class DataTransform:
 
     def __call__(self, data: Data) -> Data:
         # data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
-        embeddings = DataEmbeddings(config)
-        data = data(embeddings)
+        embeddings = DataEmbeddings(self.config)
+        data = embeddings(data)
         return data
 
 def enumerate_labels(labels):
@@ -446,8 +447,8 @@ def load_data(config):
     
     dataset = PygGraphPropPredDataset(root='data', name='ogbg-ppa', transform=transform, pre_transform=pre_transform)
 
-
-
+    # sample = dataset[0]
+    # print(sample)
     split_idx = dataset.get_idx_split()
 
     
