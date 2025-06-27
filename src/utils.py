@@ -135,6 +135,7 @@ def find_diameter_endpoints(adj: torch.sparse_coo_tensor):
     u2, _ = farthest_node_sparse(adj, start=u1)
     return u1, u2
 
+
 # Given a graph, computes an pseudo-positional/harmonic embedding on the nodes by the following:
 # 1. Find the two "outermost" nodes
 # 2. For each of the two nodes, run wavelet transform with a starting signal as a dirac on that node, at variable scales
@@ -174,7 +175,10 @@ def get_eigvecs(adj, num_eigenvectors):
 
 def scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5):
     filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
-        
+    
+    if len(wavelet_inds) != 0:
+        if max(wavelet_inds < len(filters)):
+            filters = filters[wavelet_inds]
     U = torch.abs(filters[0])
     for i in range(1, len(filters)):
         U = torch.abs(U @ filters[i])
@@ -185,8 +189,13 @@ def scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5):
 
     return embeddings
 
-def global_scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, num_moments=4):
+def global_scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, num_moments=4, wavelet_inds=[]):
     filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
+
+    if len(wavelet_inds) != 0:
+        if max(wavelet_inds < len(filters)):
+            filters = filters[wavelet_inds]
+
     U = torch.abs(filters[0])
     for i in range(1, len(filters)):
         U = torch.abs(U @ filters[i])
