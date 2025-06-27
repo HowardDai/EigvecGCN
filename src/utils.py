@@ -29,10 +29,12 @@ def diffusion_transform(data: Data):
     diff_op = adj @ torch.inverse(degree)
 
     u0 = torch.eye(adj.shape[0])
-    u2 = diff_op @ diff_op @ u0
+    u2 = diff_op @ diff_op
     u16 = u2
-    for i in range(14):
-        u16 = diff_op @ u2
+    for i in range(4):
+        u16 = u16 @ u16
+    u2 = u2 @ u0
+    u16 = u16 @ u0
     return torch.stack((u0, u2, u16))
 
 def diffusion_convolution(U, data: Data):
@@ -149,23 +151,19 @@ def generate_wavelet_bank(data: Data, num_scales=10, lazy_parameter=0.5, abs_val
 # 1. Find the two "outermost" nodes
 # 2. For each of the two nodes, run wavelet transform with a starting signal as a dirac on that node, at variable scales
 # 3. 
-def wavelet_transform_positional(data: Data, num_scales=10, lazy_parameter=0.5):
+def wavelet_transform_positional(data: Data, num_scales=10, lazy_parameter=0.5, k=2):
 
     adj = data.edge_index
-    n1, n2 = find_diameter_endpoints(adj)
+    nodes = list(find_diameter_endpoints(adj)) + list(degree_node_selection(adj, k, largest=True))
     N = adj.size(0)
 
     filters = generate_wavelet_bank(data, num_scales=10, lazy_parameter=0.5)
 
-    embs1 = torch.zeros(N, num_scales)
-    embs2 = torch.zeros(N, num_scales)
+    embs = torch.zeros(N, num_scales * (k + 2))
 
     for i in range(num_scales):
+        embs[:, i * nodes:(i+1)*nodes] = filters[i][:, nodes]
 
-        embs1[:, i] = filters[i][:, n1]
-        embs2[:, i] = filters[i][:, n2]
-
-    embs = torch.cat((embs1, embs2), dim=1)
     return embs 
 
 
@@ -215,7 +213,7 @@ def get_padded_eigvecs(adj: torch.Tensor, max_graph_size: int = 300):
 
 
 def scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, wavelet_inds=[]):
-    filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
+    filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False, k=2)
     
     if len(wavelet_inds) != 0:
         filters = [filters[i] for i in wavelet_inds]
@@ -223,7 +221,7 @@ def scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, wavelet_
     for i in range(1, len(filters)):
         U = torch.abs(U @ filters[i])
 
-    nodes = list(find_diameter_endpoints(data.edge_index))
+    nodes = list(find_diameter_endpoints(data.edge_index)) + list(degree_node_selection(adj, k, largest=True))
 
     embeddings = U[:, nodes]
 
