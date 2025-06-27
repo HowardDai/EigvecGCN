@@ -443,7 +443,6 @@ def load_data(config):
 
     
         
-    # pre_transform = DataPreTransform(config)
     transform = DataTransform(config)
     embeddings = DataEmbeddings(config)
     
