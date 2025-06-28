@@ -39,6 +39,8 @@ parser.add_argument("--scatter_emb",action="store_true")
 parser.add_argument("--global_scatter_emb",action="store_true")
 # for each node, dirac, scatter wavelets, and then global moment aggregation 
 
+parser.add_argument("--use_mini_dataset", type=bool, default=False)
+# parser.add_argument("--embed_each_epoch")
 
 parser.add_argument("--use_supervised", type=bool, default=True) 
 

@@ -23,6 +23,9 @@ import torch.nn as nn
 
 from tqdm import tqdm
 
+import random
+from torch.utils.data import Subset
+
 def diffusion_transform(data: Data):
     adj = data.edge_index
     degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
@@ -143,6 +146,7 @@ def generate_wavelet_bank(data: Data, num_scales=10, lazy_parameter=0.5, abs_val
         filters = filters + (wavelet_filter,)
 
         diff_op_1 = diff_op_2 
+
 
     return filters
 
@@ -297,38 +301,54 @@ def pre_transform(data):  # computes eigvecs eigvals and reformats edge_index
  
     return data
 
+import time
+
 class DataEmbeddings:
     def __init__(self, config):
         self.config = config
 
     def __call__(self, data: Data) -> Data:
         # BUILDING EMBEDDINGS
-
+        t1 = time.time()
         if self.config.diffusion_emb:
             U = diffusion_transform(data)
             data.diffusion_emb = diffusion_convolution(U, data)
             # data.x = torch.cat((data.x, diffusion_convolution(U, data)), dim=-1)
+        t2 = time.time()
+        # print("Diffusion runtime:", t2-t1)
 
+        t1 = time.time()
         if self.config.wavelet_emb:
             # data.x = torch.cat((data.x, wavelet_transform_positional(data)), dim=-1)
             data.wavelet_emb = wavelet_transform_positional(data)
+        t2= time.time() 
+        # print("Wavelet runtime:", t2-t1)
+
+
+        t1 = time.time()
         if self.config.scatter_emb:
             # data.x = torch.cat((data.x, scattering_transform(data)), dim=-1)
             wavelet_paths = custom_wavelet_choices()
             data.scatter_emb = torch.zeros(data.num_nodes, 0, dtype=torch.float32)
             for i in range(len(wavelet_paths)):
                 data.scatter_emb = torch.cat((data.scatter_emb, scattering_transform(data,wavelet_inds = wavelet_paths[i])), dim=-1)
+        t2 = time.time()
+        # print("Scatter runtime:", t2-t1)
 
+        t1=time.time()
         if self.config.global_scatter_emb:
             wavelet_paths = custom_wavelet_choices()
             data.global_scatter_emb = torch.zeros(data.num_nodes, 0, dtype=torch.float32)
             for i in range(len(wavelet_paths)):
                 data.global_scatter_emb = torch.cat((data.scatter_emb, global_scattering_transform(data,wavelet_inds = wavelet_paths[i])), dim=-1)
-
+        t2=time.time()
+        # print("Global scatter runtime:", t2-t1)
+        
             # data.x = torch.cat((data.x, global_scattering_transform(data)), dim=-1)
 
 
         # CONCATENATING THE EMBEDDINGS 
+        t1=time.time()
         data.x = torch.ones(data.num_nodes, 0, dtype=torch.float32)
 
 
@@ -347,7 +367,9 @@ class DataEmbeddings:
 
         if data.x.shape[-1] == 0: # trivial embeddings, if no other embeddings
             data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
-    
+
+        t2 = time.time()
+        # print("Concatenation step:", t2-t1)
         return data
 
 
@@ -357,8 +379,8 @@ class DataTransform:
 
     def __call__(self, data: Data) -> Data:
         # data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
-        embeddings = DataEmbeddings(self.config)
-        data = embeddings(data)
+        # embeddings = DataEmbeddings(self.config)
+        # data = embeddings(data)
         return data
 
 def enumerate_labels(labels):
@@ -445,16 +467,79 @@ def load_data(config):
     transform = DataTransform(config)
     embeddings = DataEmbeddings(config)
     
+    
     dataset = PygGraphPropPredDataset(root='data', name='ogbg-ppa', transform=transform, pre_transform=pre_transform)
+    print('data object loaded!')
 
     # sample = dataset[0]
     # print(sample)
+
     split_idx = dataset.get_idx_split()
 
+
+    # sample a fraction of each split
+    seed = 42
+    subset_frac = 0.02
+    random.seed(seed)
+    def sample_idx(idx_list):
+        n = max(1, int(len(idx_list) * subset_frac))
+        return random.sample(idx_list, n)
+
+    if config.use_mini_dataset:
+        print(f"sampling {subset_frac} of dataset")
+        temp_train_idx = torch.tensor(sample_idx(split_idx['train'].tolist()))
+        temp_val_idx   = torch.tensor(sample_idx(split_idx['valid'].tolist()))
+        temp_test_idx  = torch.tensor(sample_idx(split_idx['test'].tolist()))
+        all_indices = torch.cat((temp_train_idx, temp_val_idx, temp_test_idx))
+
+        a = temp_train_idx.shape[0]
+        b= temp_val_idx.shape[0] + a
+        c= temp_test_idx.shape[0] + b 
+
+        # produces train/val/test indices relative to NEW dataset (after subset)
+        train_idx = torch.arange(start=0, end=a)
+        val_idx = torch.arange(start=a, end=b)
+        test_idx = torch.arange(start=b, end= c)
+
     
-    train_loader = DataLoader(dataset[split_idx['train']], batch_size=32, shuffle=True) # ISSUE: right now this is just concatenating everything in the batch, treating it lke a huge graph
-    val_loader   = DataLoader(dataset[split_idx['valid']], batch_size=64, shuffle=False)
-    test_loader  = DataLoader(dataset[split_idx['test']],  batch_size=1, shuffle=False)
+    else:
+        print("Using full dataset")
+        train_idx = split_idx['train'] 
+        val_idx = split_idx['val']  
+        test_idx = split_idx['test'] 
+        all_indices = torch.sort(torch.cat((train_idx, val_idx, test_idx))) # basically just all the indices
+
+
+    # preprocessing embeddings
+    print("Processing embeddings...")
+    modified_list = []
+    embeddings = DataEmbeddings(config)
+
+    for data in tqdm(dataset[all_indices]):
+        data = embeddings(data)
+        modified_list.append(data)
+
+    # 2) wrap them into a tiny InMemoryDataset
+    from torch_geometric.data import InMemoryDataset
+
+    class CustomGraphDataset(InMemoryDataset):
+        def __init__(self, data_list):
+            super().__init__(root=None)
+            self.data_list = data_list
+
+        def len(self):
+            return len(self.data_list)
+
+        def get(self, idx):
+            return self.data_list[idx]
+
+    dataset = CustomGraphDataset(modified_list)
+
+    print("Embeddings processed!")
+
+    train_loader = DataLoader(dataset[train_idx], batch_size=32, shuffle=True) # ISSUE: right now this is just concatenating everything in the batch, treating it lke a huge graph
+    val_loader   = DataLoader(dataset[val_idx], batch_size=64, shuffle=False)
+    test_loader  = DataLoader(dataset[test_idx],  batch_size=1, shuffle=False)
 
 
     return dataset, train_loader, val_loader, test_loader
