@@ -155,20 +155,19 @@ def generate_wavelet_bank(data: Data, num_scales=10, lazy_parameter=0.5, abs_val
 # 1. Find the two "outermost" nodes
 # 2. For each of the two nodes, run wavelet transform with a starting signal as a dirac on that node, at variable scales
 # 3. 
-def wavelet_transform_positional(data: Data, num_scales=10, lazy_parameter=0.5, k=2):
+def wavelet_transform_positional(data: Data, num_scales=10, lazy_parameter=0.5):
 
     adj = data.edge_index
-    nodes = list(find_diameter_endpoints(adj)) + list(degree_node_selection(adj, k, largest=True))
-    num_selected_nodes = len(nodes)
     N = adj.size(0)
 
     filters = generate_wavelet_bank(data, num_scales=10, lazy_parameter=0.5)
 
-    embs = torch.zeros(N, num_scales * (k + 2))
+    embs = torch.zeros(N, num_scales)
+    signal = torch.ones(N)
 
     for i in range(num_scales):
-        embs[:, i * num_selected_nodes:(i+1)*num_selected_nodes] = filters[i][:, nodes]
-
+        embs[:, i] = filters[i] @ signal
+        
     return embs 
 
 
