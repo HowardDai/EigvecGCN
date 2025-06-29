@@ -41,7 +41,9 @@ if __name__ == "__main__":
     
     
     os.makedirs(config.checkpoint_folder, exist_ok=True)
-    
+    print("Started training with 1 run.",
+               f"Early stopping: {'Yes' if config.use_early_stopping else 'No'}")
+
     training_loop(model, train_loader, val_loader, optimizer, device, config)
 
 
