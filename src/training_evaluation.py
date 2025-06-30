@@ -71,18 +71,15 @@ def OrthogonalityLoss(eigvecs):
     return torch.norm(off_diag)
 
 
-def SupervisedEigenvalueLoss(eigvecs_pred, adj, eigvals_gt, batch):
+def SupervisedEigenvalueLoss(eigvecs_pred, adj, eigvals_gt, batch, num_evecs):
     L = get_lap(adj)
     loss = 0
     print(eigvals_gt.shape)
     for i in range(batch[-1] + 1):
-        inds = torch.where(batch == i)
+        inds = list(torch.argwhere(batch == i).squeeze())
         lap = L[inds][inds]
-        print(lap)
         evecs_pred = eigvecs_pred[inds]
-        print(evecs_pred)
-        diag_eigvals = torch.diag(eigvals_gt[inds][:30])
-        print(diag_eigvals.shape)
+        diag_eigvals = torch.diag(eigvals_gt[inds][:num_evecs])
         loss += torch.norm(lap @ evecs_pred  - evecs_pred @ diag_eigvals)
     return loss
 
@@ -115,7 +112,7 @@ def train(model, loader, optimizer, device, config):
         if config.loss_function == 'energy':
             loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
         if config.loss_function == 'supervised_eigval':
-            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals, data.batch)
+            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals, data.batch, config.num_eigenvectors)
         if config.loss_function == 'supervised_mse':
             loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
         if config.loss_function == 'supervised_lap_reconstruction':
