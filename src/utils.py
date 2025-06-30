@@ -25,6 +25,8 @@ from tqdm import tqdm
 
 import random
 from torch.utils.data import Subset
+from typing import List
+
 
 def diffusion_transform(data: Data):
     adj = data.edge_index
@@ -215,8 +217,21 @@ def get_padded_eigvecs(adj: torch.Tensor, max_graph_size: int = 300):
 
 ##Geometric Scattering
 
+# for generating all possible wavelet combinations 
+def all_index_combinations(k: int) -> List[List[int]]:
+    """
+    Return all subsets of {0,1,...,k-1}, sorted by
+    the integer value of their binary inclusion mask.
+    """
+    result = []
+    for mask in range(1 << k):            # 0 .. 2^k - 1
+        subset = [i for i in range(k) 
+                  if (mask >> i) & 1]     # include i if bit i is 1
+        result.append(subset)
+    return result
 
-def scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, wavelet_inds=[]):
+
+def scattering_transform(data: Data, num_scales=5, lazy_parameter=0.5, wavelet_inds=[]):
     filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
     
     if len(wavelet_inds) != 0:
@@ -291,6 +306,17 @@ def get_lap(adj):
     lap = degree - adj
     return lap
 
+def get_diag(entries: torch.Tensor):
+    N = entries.size(0)
+    device = entries.device
+    # 2) build sparse diagonal: indices = [[0,1,2,…],[0,1,2,…]]
+    idx = torch.arange(N, device=device)
+    indices = torch.stack([idx, idx], dim=0)               # [2×N]
+    values  = entries                                    # [N]
+
+    D = torch.sparse_coo_tensor(indices, values, (N, N),
+                                device=device)
+    return D
 
 def pre_transform(data):  # computes eigvecs eigvals and reformats edge_index
     data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
@@ -327,7 +353,7 @@ class DataEmbeddings:
         t1 = time.time()
         if self.config.scatter_emb:
             # data.x = torch.cat((data.x, scattering_transform(data)), dim=-1)
-            wavelet_paths = custom_wavelet_choices()
+            wavelet_paths = all_index_combinations(5)
             data.scatter_emb = torch.zeros(data.num_nodes, 0, dtype=torch.float32)
             for i in range(len(wavelet_paths)):
                 data.scatter_emb = torch.cat((data.scatter_emb, scattering_transform(data,wavelet_inds = wavelet_paths[i])), dim=-1)
@@ -369,6 +395,10 @@ class DataEmbeddings:
 
         t2 = time.time()
         # print("Concatenation step:", t2-t1)
+
+        #modifying the eigval and eigvec matrices to match the # of eigvecs we actually care about
+        data.eigvecs = data.eigvecs[0:self.config.num_eigenvectors, 0:self.config.num_eigenvectors]
+        data.eigvals = data.eigvals[0:self.config.num_eigenvectors]
         return data
 
 

@@ -7,7 +7,7 @@ import time
 
 from tqdm import tqdm
 
-from utils import normalize_by_batch, orthogonalize_by_batch
+from utils import *
 
 def SupervisedLoss(evecs_pred, evecs_gt):
     return torch.norm(evecs_pred - evecs_gt)
@@ -22,13 +22,7 @@ def EnergyLoss(eigvecs, adj, weights=None):
     deg_vec = torch.sparse.sum(adj, dim=1).to_dense()      # [N]
 
     # 2) build sparse diagonal: indices = [[0,1,2,…],[0,1,2,…]]
-    idx = torch.arange(N, device=device)
-    indices = torch.stack([idx, idx], dim=0)               # [2×N]
-    values  = deg_vec                                    # [N]
-
-    D = torch.sparse_coo_tensor(indices, values, (N, N),
-                                device=device)
-
+    D = torch.diag(deg_vec)
     # 3) sparse-sparse subtraction (yields a sparse result)
     L = D - adj
 
@@ -40,16 +34,11 @@ def EnergyLoss(eigvecs, adj, weights=None):
     num_eigenvectors = eigvecs.shape[-1]
 
     if weights == None:
-        weights = torch.ones(num_eigenvectors)
+        weights = torch.ones(num_eigenvectors).to(device)
 
 
     # build diagonal of weights
-    idx = torch.arange(num_eigenvectors, device=device)
-    indices = torch.stack([idx, idx], dim=0)               # [2×num_eigs]
-    values  = weights                                    # [num_eigs]
-
-    diag_weights = torch.sparse_coo_tensor(indices, values, (num_eigenvectors, num_eigenvectors),
-                                device=device)
+    diag_weights=torch.diag(weights)
 
     energy = torch.trace(
         eigvecs.transpose(-2, -1) @ L @ eigvecs @ diag_weights
@@ -81,6 +70,13 @@ def OrthogonalityLoss(eigvecs):
     #    If you prefer a squared penalty, do off_diag.pow(2).sum()
     return torch.norm(off_diag)
 
+
+def SupervisedEigenvalueLoss(eigvecs_pred, adj, eigvals_gt):
+    lap = get_lap(adj)
+    diag_eigvals = get_diag(eigvals_gt)
+    return torch.norm(lap @ eigvecs_pred  - eigvecs_pred @ diag_eigvals)
+
+
 def train(model, loader, optimizer, device, config):
     model.to(device)
 
@@ -105,16 +101,16 @@ def train(model, loader, optimizer, device, config):
 
         energy_loss = EnergyLoss(out, data.edge_index)
         ortho_loss = OrthogonalityLoss(out)
-        loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
 
+        if config.loss_function == 'energy':
+            loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
         if config.loss_function == 'supervised_eigval':
-            loss = eigenvalue_loss()
+            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals)
         if config.loss_function == 'supervised_mse':
-            loss = SupervisedLoss(out, data.y)
+            loss = SupervisedLoss(out, data.eigvecs)
         elif config.loss_function == 'supervised_lap_reconstruction':
             return 
-        elif config.loss_function == 'supervised_eigval':
-            return
+
 
         # print("energy", energy_loss)
         # print("ortho", ortho_loss)
@@ -154,14 +150,14 @@ def validate(model, loader, optimizer, device, config):
         ortho_loss = OrthogonalityLoss(out)
         loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
 
+        if config.loss_function == 'energy':
+            loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
         if config.loss_function == 'supervised_eigval':
-            loss = eigenvalue_loss()
+            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals)
         if config.loss_function == 'supervised_mse':
-            loss = SupervisedLoss(out, data.y)
+            loss = SupervisedLoss(out, data.eigvecs)
         elif config.loss_function == 'supervised_lap_reconstruction':
             return 
-        elif config.loss_function == 'supervised_eigval':
-            return
 
             
         batch_size = int(data.batch.max()) + 1

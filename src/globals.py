@@ -21,7 +21,7 @@ parser.add_argument("--lr", type=float, default=1e-2)
 parser.add_argument("--weight_decay", type=float, default=5e-3)
 parser.add_argument("--patience", type=int, default=10)
 parser.add_argument("--epochs", type=int, default=200)
-parser.add_argument("--use_early_stopping", type=bool, default=True)
+parser.add_argument("--use_early_stopping", action="store_true")
 parser.add_argument("--multiple_runs", type=bool, default=False)
 parser.add_argument("--num_of_runs", type=int, default=100)
 parser.add_argument("--follow_paper", type=bool, default=True)
@@ -39,12 +39,12 @@ parser.add_argument("--scatter_emb",action="store_true")
 parser.add_argument("--global_scatter_emb",action="store_true")
 # for each node, dirac, scatter wavelets, and then global moment aggregation 
 
-parser.add_argument("--use_mini_dataset", type=bool, default=False)
+parser.add_argument("--use_mini_dataset", action="store_true")
 # parser.add_argument("--embed_each_epoch")
 
 parser.add_argument("--use_supervised", type=bool, default=True) 
 
-parser.add_argument("--forced_ortho", type=bool, default=True) 
+parser.add_argument("--forced_ortho", action="store_true") 
 
 parser.add_argument("--checkpoint_folder", type=str, default="checkpoints")
 
