@@ -71,11 +71,11 @@ def OrthogonalityLoss(eigvecs):
     return torch.norm(off_diag)
 
 
-def SupervisedEigenvalueLoss(eigvecs_pred, adj, eigvals_gt):
-    lap = get_lap(adj)
-    diag_eigvals = torch.diag(eigvals_gt)
-    print(diag_eigvals.shape)
-    return torch.norm(lap @ eigvecs_pred  - eigvecs_pred @ diag_eigvals) # TODO: need to fix. Basically needthe column weighting to happen PER graph and PER set of eigvals
+# def SupervisedEigenvalueLoss(eigvecs_pred, adj, eigvals_gt):
+#     lap = get_lap(adj)
+#     diag_eigvals = torch.diag(eigvals_gt)
+#     print(diag_eigvals.shape)
+#     return torch.norm(lap @ eigvecs_pred  - eigvecs_pred @ diag_eigvals) # TODO: need to fix. Basically needthe column weighting to happen PER graph and PER set of eigvals
 
 
 def SupervisedEigenvalueLossUnweighted(eigvecs_pred, adj, eigvals_gt):
@@ -84,6 +84,24 @@ def SupervisedEigenvalueLossUnweighted(eigvecs_pred, adj, eigvals_gt):
     diag_eigvals_inv = torch.diag(eigvals_gt_inv)
     return torch.norm(lap @ eigvecs_pred @ diag_eigvals - eigvecs_pred)
 
+
+def SupervisedEigenvalueLoss(eigvecs_pred, adj, eigvals_gt, batch):
+    L = get_lap(adj)
+    loss = 0
+    print(eigvals_gt.shape)
+    print(L.shape)
+    for i in range(batch[-1] + 1):
+        inds = torch.argwhere(batch == i)
+        print(batch.shape)
+        print(inds.shape)
+        lap = L[inds,inds]
+        print(lap.shape)
+        evecs_pred = eigvecs_pred[inds]
+        print(evecs_pred.shape)
+        diag_eigvals = torch.diag(eigvals_gt[inds])
+        print(diag_eigvals.shape)
+        loss += torch.norm(lap @ evecs_pred  - evecs_pred @ diag_eigvals)
+    return loss
 
 
 def train(model, loader, optimizer, device, config):
@@ -114,9 +132,9 @@ def train(model, loader, optimizer, device, config):
         if config.loss_function == 'energy':
             loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
         if config.loss_function == 'supervised_eigval':
-            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals)
+            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals, data.batch)
         if config.loss_function == 'supervised_eigval_unweighted':
-            loss = SupervisedEigenvalueLossUnweighted(out, data.edge_index, data.eigvals)
+            loss = SupervisedEigenvalueLossUnweighted(out, data.edge_index, data.eigvals, data.batch)
         if config.loss_function == 'supervised_mse':
             loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
         if config.loss_function == 'supervised_lap_reconstruction':
@@ -164,11 +182,11 @@ def validate(model, loader, optimizer, device, config):
         if config.loss_function == 'energy':
             loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
         if config.loss_function == 'supervised_eigval':
-            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals)
+            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals, data.batch)
         if config.loss_function == 'supervised_mse':
             loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
         if config.loss_function == 'supervised_lap_reconstruction':
-            loss = lap_reconstruction_loss(out, data.eigvals[:config.num_eigenvectors], data.eigvecs[:, :config.num_eigenvectors], data.edge_index)
+            loss = lap_reconstruction_loss(out, data.eigvals, data.eigvecs[:, :config.num_eigenvectors], data.edge_index, data.batch)
 
             
         batch_size = int(data.batch.max()) + 1
@@ -282,69 +300,28 @@ def mse_test_loss(model, loader, device):
             loss += torch.norm(evecs_pred[inds] - evecs_gt[:, :evecs_pred.shape[1]])
     return loss
 
-def lap_reconstruction_loss(evecs_pred, lambda_gt, evecs_gt, adj):
+def lap_reconstruction_loss(evecs_pred, lambda_gt, U, adj):
     N = adj.size(0)
     lap = get_lap(adj)
 
-    graph = data.get_example(i)
-    inds = torch.argwhere(data.batch == i)
-
     U_pred = evecs_pred
-    lambda_pred = U_pred @ lap @ U_pred.T
+    lambda_pred = U_pred.T @ lap @ U_pred
 
-    U = evecs_gt[:, evecs_pred.shape[1]]
-    lambda_gt = lambda_gt[:evecs_pred.shape[1]]
+    print(U_pred.shape)
+    print(lambda_pred.shape)
 
-    low_rank_pred = U_pred @ torch.diag(lambda_pred) @ U_pred.T
+
+    low_rank_pred = U_pred @ torch.diag(torch.diag(lambda_pred))
+
+    print(low_rank_pred.shape)
+
+    low_rank_pred = low_rank_pred @ U_pred.T
     low_rank_gt = U @ torch.diag(lambda_gt) @ U.T
 
     loss = torch.norm(low_rank_pred - low_rank_gt)
 
     print(loss)
     return loss
-
-def eigenvalue_loss(model, loader, adj, device):
-    model.to(device)
-    model.eval()
-    # adj: SparseTensor in COO format on CUDA
-    device = adj.device
-    N = adj.size(0)
-    # assert(False)
-    # 1) sum to get a dense degree vector
-    deg_vec = torch.sparse.sum(adj, dim=1).to_dense()      # [N]
-
-    # 2) build sparse diagonal: indices = [[0,1,2,…],[0,1,2,…]]
-    idx = torch.arange(N, device=device)
-    indices = torch.stack([idx, idx], dim=0)               # [2×N]
-    values  = deg_vec                                    # [N]
-
-    D = torch.sparse_coo_tensor(indices, values, (N, N),
-                                device=device)
-
-    # 3) sparse-sparse subtraction (yields a sparse result)
-    L = D - adj
-
-    loss = 0
-    for data in loader:
-        print(data.batch)
-        evecs_pred = model(data.x, data.edge_index, data.batch)
-        for i in range(data.num_graphs):
-            graph = data.get_example(i)
-            inds = torch.argwhere(data.batch == i)
-
-            U_pred = evecs_pred[inds]
-            lap = L[inds, inds]
-
-            lambda_gt, evecs_gt = torch.linalg.eigh(graph.edge_index)
-            lambda_pred = U_pred @ lap @ U_pred.T
-
-            U = evecs_gt[:, evecs_pred.shape[1]]
-            lambda_gt = lambda_gt[:evecs_pred.shape[1]]
-
-            loss += torch.norm(U_pred @ U_pred.T @ lap @ U_pred @ U_pred.T - low_rank_gt)
-    return loss
-
-    
 
 
 def multiple_runs(model, features, labels, adj, indices, config, training_loop, evaluate_on_test):
