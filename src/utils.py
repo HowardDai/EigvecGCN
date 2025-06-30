@@ -236,15 +236,15 @@ def scattering_transform(data: Data, num_scales=5, lazy_parameter=0.5, wavelet_i
     
     if len(wavelet_inds) != 0:
         filters = [filters[i] for i in wavelet_inds]
-    U = torch.abs(filters[0])
+    
+    signal = torch.ones(filters[0].shape[0])
+
+    U = torch.abs(filters[0] @ signal)
     for i in range(1, len(filters)):
         U = torch.abs(U @ filters[i])
 
-    nodes = list(find_diameter_endpoints(data.edge_index)) + list(degree_node_selection(data.edge_index, 2, largest=True))
 
-    embeddings = U[:, nodes]
-
-    return embeddings
+    return U
 
 def global_scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, num_moments=5, wavelet_inds=[]):
     filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
