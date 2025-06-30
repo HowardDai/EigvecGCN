@@ -71,10 +71,20 @@ def OrthogonalityLoss(eigvecs):
     return torch.norm(off_diag)
 
 
-def SupervisedEigenvalueLoss(eigvecs_pred, adj, eigvals_gt):
-    lap = get_lap(adj)
-    diag_eigvals = get_diag(eigvals_gt)
-    return torch.norm(lap @ eigvecs_pred  - eigvecs_pred @ diag_eigvals)
+def SupervisedEigenvalueLoss(eigvecs_pred, adj, eigvals_gt, batch):
+    L = get_lap(adj)
+    loss = 0
+    print(eigvals_gt.shape)
+    for i in range(batch[-1] + 1):
+        inds = torch.where(batch == i)
+        lap = L[inds][inds]
+        print(lap)
+        evecs_pred = eigvecs_pred[inds]
+        print(evecs_pred)
+        diag_eigvals = torch.diag(eigvals_gt[inds][:30])
+        print(diag_eigvals.shape)
+        loss += torch.norm(lap @ evecs_pred  - evecs_pred @ diag_eigvals)
+    return loss
 
 
 def train(model, loader, optimizer, device, config):
@@ -105,7 +115,7 @@ def train(model, loader, optimizer, device, config):
         if config.loss_function == 'energy':
             loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
         if config.loss_function == 'supervised_eigval':
-            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals[:config.num_eigenvectors])
+            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals, data.batch)
         if config.loss_function == 'supervised_mse':
             loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
         if config.loss_function == 'supervised_lap_reconstruction':
@@ -153,11 +163,11 @@ def validate(model, loader, optimizer, device, config):
         if config.loss_function == 'energy':
             loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
         if config.loss_function == 'supervised_eigval':
-            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals[:config.num_eigenvectors])
+            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals, data.batch)
         if config.loss_function == 'supervised_mse':
             loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
         if config.loss_function == 'supervised_lap_reconstruction':
-            loss = lap_reconstruction_loss(out, data.eigvals[:config.num_eigenvectors], data.eigvecs[:, :config.num_eigenvectors], data.edge_index)
+            loss = lap_reconstruction_loss(out, data.eigvals, data.eigvecs[:, :config.num_eigenvectors], data.edge_index, data.batch)
 
             
         batch_size = int(data.batch.max()) + 1
@@ -261,20 +271,22 @@ def mse_test_loss(model, loader, device):
             loss += torch.norm(evecs_pred[inds] - evecs_gt[:, :evecs_pred.shape[1]])
     return loss
 
-def lap_reconstruction_loss(evecs_pred, lambda_gt, evecs_gt, adj):
+def lap_reconstruction_loss(evecs_pred, lambda_gt, U, adj):
     N = adj.size(0)
     lap = get_lap(adj)
 
-    graph = data.get_example(i)
-    inds = torch.argwhere(data.batch == i)
-
     U_pred = evecs_pred
-    lambda_pred = U_pred @ lap @ U_pred.T
+    lambda_pred = U_pred.T @ lap @ U_pred
 
-    U = evecs_gt[:, evecs_pred.shape[1]]
-    lambda_gt = lambda_gt[:evecs_pred.shape[1]]
+    print(U_pred.shape)
+    print(lambda_pred.shape)
 
-    low_rank_pred = U_pred @ torch.diag(lambda_pred) @ U_pred.T
+
+    low_rank_pred = U_pred @ torch.diag(torch.diag(lambda_pred))
+
+    print(low_rank_pred.shape)
+
+    low_rank_pred = low_rank_pred @ U_pred.T
     low_rank_gt = U @ torch.diag(lambda_gt) @ U.T
 
     loss = torch.norm(low_rank_pred - low_rank_gt)

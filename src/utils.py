@@ -397,8 +397,8 @@ class DataEmbeddings:
         # print("Concatenation step:", t2-t1)
 
         #modifying the eigval and eigvec matrices to match the # of eigvecs we actually care about
-        data.eigvecs = data.eigvecs[0:self.config.num_eigenvectors, 0:self.config.num_eigenvectors]
-        data.eigvals = data.eigvals[0:self.config.num_eigenvectors]
+        #data.eigvecs = data.eigvecs[0:self.config.num_eigenvectors, 0:self.config.num_eigenvectors]
+        #data.eigvals = data.eigvals[0:self.config.num_eigenvectors]
         return data
 
 
