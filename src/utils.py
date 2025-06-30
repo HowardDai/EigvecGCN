@@ -508,7 +508,7 @@ def load_data(config):
 
     # sample a fraction of each split
     seed = 42
-    subset_frac = 0.02
+    subset_frac = 0.002
     random.seed(seed)
     def sample_idx(idx_list):
         n = max(1, int(len(idx_list) * subset_frac))
