@@ -122,7 +122,6 @@ def train(model, loader, optimizer, device, config):
 
     model.train()
     total_loss = 0
-    total_energy_loss = 0
     total_ortho_loss = 0
 
     for data in tqdm(loader):
@@ -167,17 +166,15 @@ def train(model, loader, optimizer, device, config):
 
 
     total_loss = total_loss / len(loader.dataset)
-    total_energy_loss = total_energy_loss / len(loader.dataset)
     total_ortho_loss = total_ortho_loss / len(loader.dataset)
 
 
-    return total_loss, total_energy_loss, total_ortho_loss
+    return total_loss, total_ortho_loss
 
 def validate(model, loader, optimizer, device, config):
     model.eval()
 
     total_loss = 0
-    total_energy_loss = 0
     total_ortho_loss = 0
     for data in tqdm(loader):
         data = data.to(device)
@@ -206,14 +203,12 @@ def validate(model, loader, optimizer, device, config):
             
         batch_size = int(data.batch.max()) + 1
         total_loss += loss.item()
-        total_energy_loss += energy_loss.item() 
         total_ortho_loss += ortho_loss.item() 
 
     total_loss = total_loss / len(loader.dataset)
-    total_energy_loss = total_energy_loss / len(loader.dataset)
     total_ortho_loss = total_ortho_loss / len(loader.dataset)
     
-    return total_loss, total_energy_loss, total_ortho_loss
+    return total_loss, total_ortho_loss
 
 
 def training_loop(model, train_loader, val_loader, optimizer, device, config):
@@ -237,11 +232,11 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
 
         optimizer.zero_grad()
         
-        train_loss, train_loss_energy, train_loss_ortho = train(model, train_loader, optimizer, device, config)
+        train_loss, train_loss_ortho = train(model, train_loader, optimizer, device, config)
 
         with torch.no_grad():
             
-            val_loss, val_loss_energy, val_loss_ortho = validate(model, val_loader, optimizer, device, config)
+            val_loss, val_loss_ortho = validate(model, val_loader, optimizer, device, config)
 
             validation_loss.append(val_loss)
 
@@ -261,8 +256,8 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
                         t_end = time.time()
 
         if not config.multiple_runs:
-            print(" | ".join([f"Epoch: {epoch:4d}", f"Train loss: {train_loss:.3f}", f"Train loss (energy): {train_loss_energy:.3f}", f"Train loss (ortho): {train_loss_ortho:.3f}",
-                              f"Val loss: {val_loss:.3f}",  f"Val loss (energy): {val_loss_energy:.3f}",  f"Val loss (ortho): {val_loss_ortho:.3f}"
+            print(" | ".join([f"Epoch: {epoch:4d}", f"Train loss: {train_loss:.3f}", f"Train loss (ortho): {train_loss_ortho:.3f}",
+                              f"Val loss: {val_loss:.3f}",  f"Val loss (ortho): {val_loss_ortho:.3f}"
                              ]))
                              
 
@@ -286,7 +281,6 @@ def evaluate(model, loader, optimizer, device, config):
     model.eval()
 
     total_loss = 0
-    total_energy_loss = 0
     total_ortho_loss = 0
     loss_dict = {'energy': 0, 'supervised_eigval': 0, 'supervised_eigval_unweighted': 0, 'supervised_mse': 0, 'supervised_lap_reconstruction': 0, 'ortho': 0}
     
