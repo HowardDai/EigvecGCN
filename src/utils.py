@@ -306,17 +306,17 @@ def get_lap(adj):
     lap = degree - adj
     return lap
 
-def get_diag(entries: torch.Tensor):
-    N = entries.size(0)
-    device = entries.device
-    # 2) build sparse diagonal: indices = [[0,1,2,…],[0,1,2,…]]
-    idx = torch.arange(N, device=device)
-    indices = torch.stack([idx, idx], dim=0)               # [2×N]
-    values  = entries                                    # [N]
+# def get_diag(entries: torch.Tensor):
+#     N = entries.size(0)
+#     device = entries.device
+#     # 2) build sparse diagonal: indices = [[0,1,2,…],[0,1,2,…]]
+#     idx = torch.arange(N, device=device)
+#     indices = torch.stack([idx, idx], dim=0)               # [2×N]
+#     values  = entries                                    # [N]
 
-    D = torch.sparse_coo_tensor(indices, values, (N, N),
-                                device=device)
-    return D
+#     D = torch.sparse_coo_tensor(indices, values, (N, N),
+#                                 device=device)
+#     return D
 
 def pre_transform(data):  # computes eigvecs eigvals and reformats edge_index
     data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
@@ -397,7 +397,7 @@ class DataEmbeddings:
         # print("Concatenation step:", t2-t1)
 
         #modifying the eigval and eigvec matrices to match the # of eigvecs we actually care about
-        data.eigvecs = data.eigvecs[0:self.config.num_eigenvectors, 0:self.config.num_eigenvectors]
+        data.eigvecs = data.eigvecs[:, 0:self.config.num_eigenvectors]
         data.eigvals = data.eigvals[0:self.config.num_eigenvectors]
         return data
 
@@ -489,7 +489,6 @@ def load_data(config):
 
     # dataset and splits
     
-    
 
     
         
@@ -508,17 +507,21 @@ def load_data(config):
 
     # sample a fraction of each split
     seed = 42
-    subset_frac = 0.02
+    subset_frac = config.use_mini_dataset
     random.seed(seed)
+
     def sample_idx(idx_list):
         n = max(1, int(len(idx_list) * subset_frac))
         return random.sample(idx_list, n)
 
-    if config.use_mini_dataset:
+    if config.use_mini_dataset < 1:
         print(f"sampling {subset_frac} of dataset")
         temp_train_idx = torch.tensor(sample_idx(split_idx['train'].tolist()))
         temp_val_idx   = torch.tensor(sample_idx(split_idx['valid'].tolist()))
         temp_test_idx  = torch.tensor(sample_idx(split_idx['test'].tolist()))
+
+        
+
         all_indices = torch.cat((temp_train_idx, temp_val_idx, temp_test_idx))
 
         a = temp_train_idx.shape[0]

@@ -26,7 +26,7 @@ parser.add_argument("--multiple_runs", type=bool, default=False)
 parser.add_argument("--num_of_runs", type=int, default=100)
 parser.add_argument("--follow_paper", type=bool, default=True)
 
-parser.add_argument("--loss_function", type=str, choices=['energy', 'supervised_eigval', 'supervised_lap_reconstruction', 'supervised_mse'], default='energy')
+parser.add_argument("--loss_function", type=str, choices=['energy', 'supervised_eigval', 'supervised_eigval_unweighted', 'supervised_lap_reconstruction', 'supervised_mse'], default='energy')
 # parser.add_argument("--embedding_type", type=str, choices=['diffusion', 'wavelet', 'trivial', 'scatter'], default='trivial')
 parser.add_argument("--diffusion_emb",action="store_true")
 
@@ -39,7 +39,7 @@ parser.add_argument("--scatter_emb",action="store_true")
 parser.add_argument("--global_scatter_emb",action="store_true")
 # for each node, dirac, scatter wavelets, and then global moment aggregation 
 
-parser.add_argument("--use_mini_dataset", action="store_true")
+parser.add_argument("--use_mini_dataset", type=float, default=1)
 # parser.add_argument("--embed_each_epoch")
 
 parser.add_argument("--use_supervised", type=bool, default=True) 
@@ -48,5 +48,8 @@ parser.add_argument("--forced_ortho", action="store_true")
 
 parser.add_argument("--checkpoint_folder", type=str, default="checkpoints")
 
+
+# FOR EVALUATION
+parser.add_argument("--load_model", type=str) 
 
 config = parser.parse_args()

@@ -73,8 +73,17 @@ def OrthogonalityLoss(eigvecs):
 
 def SupervisedEigenvalueLoss(eigvecs_pred, adj, eigvals_gt):
     lap = get_lap(adj)
-    diag_eigvals = get_diag(eigvals_gt)
+    diag_eigvals = torch.diag(eigvals_gt)
+    print(diag_eigvals.shape)
     return torch.norm(lap @ eigvecs_pred  - eigvecs_pred @ diag_eigvals)
+
+
+def SupervisedEigenvalueLossUnweighted(eigvecs_pred, adj, eigvals_gt):
+    lap = get_lap(adj)
+    eigvals_gt_inv = torch.reciprocal(eigvals_gt)
+    diag_eigvals_inv = torch.diag(eigvals_gt_inv)
+    return torch.norm(lap @ eigvecs_pred @ diag_eigvals - eigvecs_pred)
+
 
 
 def train(model, loader, optimizer, device, config):
@@ -106,6 +115,8 @@ def train(model, loader, optimizer, device, config):
             loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
         if config.loss_function == 'supervised_eigval':
             loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals)
+        if config.loss_function == 'supervised_eigval_unweighted':
+            loss = SupervisedEigenvalueLossUnweighted(out, data.edge_index, data.eigvals)
         if config.loss_function == 'supervised_mse':
             loss = SupervisedLoss(out, data.eigvecs)
         elif config.loss_function == 'supervised_lap_reconstruction':
@@ -154,6 +165,8 @@ def validate(model, loader, optimizer, device, config):
             loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
         if config.loss_function == 'supervised_eigval':
             loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals)
+        if config.loss_function == 'supervised_eigval_unweighted':
+            loss = SupervisedEigenvalueLossUnweighted(out, data.edge_index, data.eigvals)
         if config.loss_function == 'supervised_mse':
             loss = SupervisedLoss(out, data.eigvecs)
         elif config.loss_function == 'supervised_lap_reconstruction':
@@ -240,6 +253,16 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
 
 def evaluate_on_test(model, loader, device, config): # low frequency eigval eigvec decomposition 
     
+    if config.loss_function == 'energy':
+        loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
+    if config.loss_function == 'supervised_eigval':
+        loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals)
+    if config.loss_function == 'supervised_eigval_unweighted':
+        loss = SupervisedEigenvalueLossUnweighted(out, data.edge_index, data.eigvals)
+    if config.loss_function == 'supervised_mse':
+        loss = SupervisedLoss(out, data.eigvecs)
+    elif config.loss_function == 'supervised_lap_reconstruction':
+        return 
 
     with torch.no_grad():
         model.eval()
