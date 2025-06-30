@@ -518,6 +518,7 @@ def load_data(config):
     if config.use_mini_dataset < 1:
         print(f"sampling {subset_frac} of dataset")
         if os.path.exists(f"data/mini_dataset_indices_{subset_frac}"): # if this subset has already been generated
+            print(f"loading previously generated subset indices...")
             idx_dict = torch.load(f"data/mini_dataset_indices_{subset_frac}") 
             temp_train_idx = idx_dict['train']
             temp_val_idx = idx_dict['valid']
@@ -526,7 +527,7 @@ def load_data(config):
             temp_train_idx = torch.tensor(sample_idx(split_idx['train'].tolist()))
             temp_val_idx   = torch.tensor(sample_idx(split_idx['valid'].tolist()))
             temp_test_idx  = torch.tensor(sample_idx(split_idx['test'].tolist()))
-            idx_dict = {'train': temp_test_idx, 'valid': temp_val_idx, 'test':temp_test_idx}
+            idx_dict = {'train': temp_train_idx, 'valid': temp_val_idx, 'test':temp_test_idx}
             torch.save(idx_dict, f"data/mini_dataset_indices_{subset_frac}")
         
 
@@ -540,6 +541,10 @@ def load_data(config):
         train_idx = torch.arange(start=0, end=a)
         val_idx = torch.arange(start=a, end=b)
         test_idx = torch.arange(start=b, end= c)
+        print(a,b,c)
+        print(all_indices.shape)
+        print(split_idx['train'].shape)
+        print(split_idx['valid'].shape)
 
     
     else:
