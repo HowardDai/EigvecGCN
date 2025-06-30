@@ -138,7 +138,7 @@ def train(model, loader, optimizer, device, config):
         if config.loss_function == 'supervised_mse':
             loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
         if config.loss_function == 'supervised_lap_reconstruction':
-            loss = lap_reconstruction_loss(out, data.eigvals[:config.num_eigenvectors], data.eigvecs[:, :config.num_eigenvectors], data.edge_index)
+            loss = lap_reconstruction_loss(out, data.eigvals, data.eigvecs[:, :config.num_eigenvectors], data.edge_index, data.batch)
 
 
         # print("energy", energy_loss)
@@ -183,7 +183,7 @@ def validate(model, loader, optimizer, device, config):
             loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
         if config.loss_function == 'supervised_eigval':
             loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals, data.batch)
-        if config.loss_function == 'supervised_mse':
+        if config.loss_function == 'supervised_mse': 
             loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
         if config.loss_function == 'supervised_lap_reconstruction':
             loss = lap_reconstruction_loss(out, data.eigvals, data.eigvecs[:, :config.num_eigenvectors], data.edge_index, data.batch)
@@ -319,27 +319,41 @@ def mse_test_loss(model, loader, device):
             loss += torch.norm(evecs_pred[inds] - evecs_gt[:, :evecs_pred.shape[1]])
     return loss
 
-def lap_reconstruction_loss(evecs_pred, lambda_gt, U, adj):
-    N = adj.size(0)
-    lap = get_lap(adj)
+def lap_reconstruction_loss(eigvecs_pred, lambda_gt, evecs_gt, adj, batch):
+    
+    L = get_lap(adj)
+    loss = 0
+    num_eigvals = eigvecs_pred.shape[-1]
+    eigval_inds = torch.arange(num_eigvals, dtype=torch.long, device=adj.device)
+    eigvec_start = 0
+    evecs_gt_new = torch.clone(evecs_gt)
 
-    U_pred = evecs_pred
-    lambda_pred = U_pred.T @ lap @ U_pred
-
-    print(U_pred.shape)
-    print(lambda_pred.shape)
+    inds_all = [torch.argwhere(batch == i).squeeze().tolist() for i in range(batch[-1] + 1)]
 
 
-    low_rank_pred = U_pred @ torch.diag(torch.diag(lambda_pred))
+    for i in range(batch[-1] + 1):
+        inds  = inds_all[i]
 
-    print(low_rank_pred.shape)
+        lap = L[inds, :][:, inds]
 
-    low_rank_pred = low_rank_pred @ U_pred.T
-    low_rank_gt = U @ torch.diag(lambda_gt) @ U.T
+        evecs_pred = eigvecs_pred[inds, :]
 
-    loss = torch.norm(low_rank_pred - low_rank_gt)
+        diag_eigvals = torch.diag(lambda_gt[eigval_inds])
+        
+        eigvecs_gt = evecs_gt_new[eigvec_start:len(inds) + eigvec_start, :]
+        
 
-    print(loss)
+        lambda_pred = evecs_pred.T @ lap @ evecs_pred
+
+        low_rank_pred = evecs_pred @ torch.diag(torch.diag(lambda_pred))
+
+        low_rank_pred = low_rank_pred @ evecs_pred.T
+        low_rank_gt = eigvecs_gt @ diag_eigvals @ eigvecs_gt.T
+
+        loss += torch.norm(low_rank_pred - low_rank_gt)
+        eigval_inds = eigval_inds + 30
+        eigvec_start += 300
+
     return loss
 
 
