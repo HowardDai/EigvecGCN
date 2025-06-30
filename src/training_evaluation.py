@@ -153,11 +153,11 @@ def validate(model, loader, optimizer, device, config):
         if config.loss_function == 'energy':
             loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
         if config.loss_function == 'supervised_eigval':
-            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals)
+            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals[:config.num_eigenvectors])
         if config.loss_function == 'supervised_mse':
-            loss = SupervisedLoss(out, data.eigvecs)
+            loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
         if config.loss_function == 'supervised_lap_reconstruction':
-            loss = lap_reconstruction_loss(out, data.eigvals, data.eigvecs, data.edge_index)
+            loss = lap_reconstruction_loss(out, data.eigvals[:config.num_eigenvectors], data.eigvecs[:, :config.num_eigenvectors], data.edge_index)
 
             
         batch_size = int(data.batch.max()) + 1
