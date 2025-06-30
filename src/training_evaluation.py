@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch_geometric.utils import scatter
 
 import numpy as np
-import time
+import time 
 
 from tqdm import tqdm
 
@@ -118,9 +118,9 @@ def train(model, loader, optimizer, device, config):
         if config.loss_function == 'supervised_eigval_unweighted':
             loss = SupervisedEigenvalueLossUnweighted(out, data.edge_index, data.eigvals)
         if config.loss_function == 'supervised_mse':
-            loss = SupervisedLoss(out, data.eigvecs)
-        elif config.loss_function == 'supervised_lap_reconstruction':
-            return 
+            loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
+        if config.loss_function == 'supervised_lap_reconstruction':
+            loss = lap_reconstruction_loss(out, data.eigvals[:config.num_eigenvectors], data.eigvecs[:, :config.num_eigenvectors], data.edge_index)
 
 
         # print("energy", energy_loss)
@@ -165,12 +165,10 @@ def validate(model, loader, optimizer, device, config):
             loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
         if config.loss_function == 'supervised_eigval':
             loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals)
-        if config.loss_function == 'supervised_eigval_unweighted':
-            loss = SupervisedEigenvalueLossUnweighted(out, data.edge_index, data.eigvals)
         if config.loss_function == 'supervised_mse':
-            loss = SupervisedLoss(out, data.eigvecs)
-        elif config.loss_function == 'supervised_lap_reconstruction':
-            return 
+            loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
+        if config.loss_function == 'supervised_lap_reconstruction':
+            loss = lap_reconstruction_loss(out, data.eigvals[:config.num_eigenvectors], data.eigvecs[:, :config.num_eigenvectors], data.edge_index)
 
             
         batch_size = int(data.batch.max()) + 1
@@ -249,7 +247,7 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
 
 
     return validation_loss
-
+g
 
 def evaluate_on_test(model, loader, device, config): # low frequency eigval eigvec decomposition 
     
@@ -284,48 +282,25 @@ def mse_test_loss(model, loader, device):
             loss += torch.norm(evecs_pred[inds] - evecs_gt[:, :evecs_pred.shape[1]])
     return loss
 
-def lap_reconstruction_loss(model, loader, adj, device): # REWRITE SO IT JUST TAKES ONE DATA OBJECT (the loading step should happen in a wrapper outside )
-    model.to(device)
-    model.eval()
-    # adj: SparseTensor in COO format on CUDA
-    device = adj.device
+def lap_reconstruction_loss(evecs_pred, lambda_gt, evecs_gt, adj):
     N = adj.size(0)
-    # assert(False)
-    # 1) sum to get a dense degree vector
-    deg_vec = torch.sparse.sum(adj, dim=1).to_dense()      # [N]
+    lap = get_lap(adj)
 
-    # 2) build sparse diagonal: indices = [[0,1,2,…],[0,1,2,…]]
-    idx = torch.arange(N, device=device)
-    indices = torch.stack([idx, idx], dim=0)               # [2×N]
-    values  = deg_vec                                    # [N]
+    graph = data.get_example(i)
+    inds = torch.argwhere(data.batch == i)
 
-    D = torch.sparse_coo_tensor(indices, values, (N, N),
-                                device=device)
+    U_pred = evecs_pred
+    lambda_pred = U_pred @ lap @ U_pred.T
 
-    # 3) sparse-sparse subtraction (yields a sparse result)
-    L = D - adj
+    U = evecs_gt[:, evecs_pred.shape[1]]
+    lambda_gt = lambda_gt[:evecs_pred.shape[1]]
 
-    loss = 0
-    for data in loader:
-        print(data.batch)
-        evecs_pred = model(data.x, data.edge_index, data.batch)
-        for i in range(data.num_graphs):
-            graph = data.get_example(i)
-            inds = torch.argwhere(data.batch == i)
+    low_rank_pred = U_pred @ torch.diag(lambda_pred) @ U_pred.T
+    low_rank_gt = U @ torch.diag(lambda_gt) @ U.T
 
-            U_pred = evecs_pred[inds]
-            lap = L[inds, inds]
+    loss = torch.norm(low_rank_pred - low_rank_gt)
 
-            lambda_gt, evecs_gt = torch.linalg.eigh(graph.edge_index)
-            lambda_pred = U_pred @ lap @ U_pred.T
-
-            U = evecs_gt[:, evecs_pred.shape[1]]
-            lambda_gt = lambda_gt[:evecs_pred.shape[1]]
-
-            low_rank_pred = U_pred @ torch.diag(lambda_pred) @ U_pred.T
-            low_rank_gt = U @ torch.diag(lambda_gt) @ U.T
-
-            loss += torch.norm(low_rank_pred - low_rank_gt)
+    print(loss)
     return loss
 
 def eigenvalue_loss(model, loader, adj, device):
@@ -392,3 +367,5 @@ def multiple_runs(model, features, labels, adj, indices, config, training_loop, 
     print(f"ACC:  mean: {np.mean(acc):.2f} | std: {np.std(acc):.2f}")
     print(f"LOSS: mean: {np.mean(loss):.2f} | std: {np.std(loss):.2f}")
     print(f"Total training time: {time.time()-t1:.2f} seconds")
+
+
