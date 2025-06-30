@@ -88,19 +88,19 @@ def SupervisedEigenvalueLossUnweighted(eigvecs_pred, adj, eigvals_gt):
 def SupervisedEigenvalueLoss(eigvecs_pred, adj, eigvals_gt, batch):
     L = get_lap(adj)
     loss = 0
-    print(eigvals_gt.shape)
-    print(L.shape)
+    num_eigvals = eigvecs_pred.shape[-1]
+
+    eigval_inds = torch.arange(num_eigvals, dtype=torch.long, device=adj.device)
     for i in range(batch[-1] + 1):
-        inds = torch.argwhere(batch == i)
-        print(batch.shape)
-        print(inds.shape)
-        lap = L[inds,inds]
-        print(lap.shape)
-        evecs_pred = eigvecs_pred[inds]
-        print(evecs_pred.shape)
-        diag_eigvals = torch.diag(eigvals_gt[inds])
-        print(diag_eigvals.shape)
+        inds = list(torch.argwhere(batch == i).squeeze())
+
+        lap = L[inds][:, inds]
+        
+        evecs_pred = eigvecs_pred[inds, :]
+        diag_eigvals = torch.diag(eigvals_gt[eigval_inds])
         loss += torch.norm(lap @ evecs_pred  - evecs_pred @ diag_eigvals)
+
+        eigval_inds = eigval_inds + 30
     return loss
 
 
@@ -267,24 +267,43 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
     return validation_loss
 
 
-def evaluate_on_test(model, loader, device, config): # low frequency eigval eigvec decomposition 
-    
-    if config.loss_function == 'energy':
-        loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
-    if config.loss_function == 'supervised_eigval':
-        loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals)
-    if config.loss_function == 'supervised_eigval_unweighted':
-        loss = SupervisedEigenvalueLossUnweighted(out, data.edge_index, data.eigvals)
-    if config.loss_function == 'supervised_mse':
-        loss = SupervisedLoss(out, data.eigvecs)
-    elif config.loss_function == 'supervised_lap_reconstruction':
-        return 
+def evaluate(model, loader, optimizer, device, config):
+    model.eval()
 
-    with torch.no_grad():
-        model.eval()
-        y_pred = model(features, adj)
-        test_loss = criterion(y_pred[test_ind], labels[test_ind])
-        test_acc = accuracy(y_pred[test_ind], labels[test_ind])
+    total_loss = 0
+    total_energy_loss = 0
+    total_ortho_loss = 0
+    for data in tqdm(loader):
+        data = data.to(device)
+        out = model(data.x, data.edge_index)
+        if config.forced_ortho:
+            out = orthogonalize_by_batch(out, data.batch)
+
+        out = normalize_by_batch(out, data.batch)
+        energy_loss = EnergyLoss(out, data.edge_index)
+        ortho_loss = OrthogonalityLoss(out)
+        loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
+
+        if config.loss_function == 'energy':
+            loss = config.lambda_energy * energy_loss + config.lambda_ortho * ortho_loss
+        if config.loss_function == 'supervised_eigval':
+            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals, data.batch)
+        if config.loss_function == 'supervised_mse':
+            loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
+        if config.loss_function == 'supervised_lap_reconstruction':
+            loss = lap_reconstruction_loss(out, data.eigvals, data.eigvecs[:, :config.num_eigenvectors], data.edge_index, data.batch)
+
+            
+        batch_size = int(data.batch.max()) + 1
+        total_loss += loss.item()
+        total_energy_loss += energy_loss.item() 
+        total_ortho_loss += ortho_loss.item() 
+
+    total_loss = total_loss / len(loader.dataset)
+    total_energy_loss = total_energy_loss / len(loader.dataset)
+    total_ortho_loss = total_ortho_loss / len(loader.dataset)
+    
+    return total_loss, total_energy_loss, total_ortho_loss
 
 def mse_test_loss(model, loader, device):
     model.to(device)
