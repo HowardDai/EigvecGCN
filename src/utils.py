@@ -237,14 +237,15 @@ def scattering_transform(data: Data, num_scales=5, lazy_parameter=0.5, wavelet_i
     if len(wavelet_inds) != 0:
         filters = [filters[i] for i in wavelet_inds]
     
-    signal = torch.ones(filters[0].shape[0])
+    signal = torch.ones(filters[0].shape[0]) / torch.norm(torch.ones(filters[0].shape[0]))
 
     U = torch.abs(filters[0] @ signal)
     for i in range(1, len(filters)):
-        U = torch.abs(U @ filters[i])
+        U = torch.abs(filters[i] @ U)
 
 
-    return U
+
+    return U.unsqueeze(dim=-1) # because there is only 1 signal in this case, edit this if more 
 
 def global_scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, num_moments=5, wavelet_inds=[]):
     filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
@@ -255,7 +256,7 @@ def global_scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, n
 
     U = torch.abs(filters[0])
     for i in range(1, len(filters)):
-        U = torch.abs(U @ filters[i])
+        U = torch.abs(filters[i] @ U)
     
     
 

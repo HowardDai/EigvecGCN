@@ -27,24 +27,36 @@ if __name__ == "__main__":
     print("input_size", input_size)
 
     if config.model == 'GCN':
-        model = GCN(input_size, config.num_eigenvectors, config.dropout, config.use_bias)
+        model = GCN(input_size, config.num_eigenvectors, config.dropout, config.use_bias) 
     elif config.model == "GIN":
-        model = GIN(8, 3, input_size, 60, config.num_eigenvectors, 0.1, True, "Sum", device)
+        model = GIN(8, 3, input_size, 60, config.num_eigenvectors, 0.1, True, "Sum", device) # TODO: make these hyperparams configurable in command line 
     elif config.model == "MLP":
         model = MLP(8, input_size, 60, config.num_eigenvectors)
     else:
         print("Invalid model type")
-        
+    
+
+    
+    if config.load_model != None: # TODO: make this flexible, maybe it checks for checkpoint_folder/load_model if just loading the path given by load_model doesn't work 
+        print(f"Loading checkpoint: {config.load_model}")
+        model.load_state_dict(torch.load(config.load_model, weights_only=True))
+
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,
                                  weight_decay=config.weight_decay)
 
     
     
     os.makedirs(config.checkpoint_folder, exist_ok=True)
-    print("Started training with 1 run.",
-               f"Early stopping: {'Yes' if config.use_early_stopping else 'No'}")
 
-    training_loop(model, train_loader, val_loader, optimizer, device, config)
+
+    if config.train:
+        print("training...")
+        training_loop(model, train_loader, val_loader, optimizer, device, config)
+
+    if config.test:
+        print("testing...")
+        evaluate(model, test_loader, optimizer, device, config)
+
 
 
     # if not config.multiple_runs:
