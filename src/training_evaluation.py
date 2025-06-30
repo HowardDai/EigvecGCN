@@ -75,7 +75,7 @@ def SupervisedEigenvalueLoss(eigvecs_pred, adj, eigvals_gt):
     lap = get_lap(adj)
     diag_eigvals = torch.diag(eigvals_gt)
     print(diag_eigvals.shape)
-    return torch.norm(lap @ eigvecs_pred  - eigvecs_pred @ diag_eigvals)
+    return torch.norm(lap @ eigvecs_pred  - eigvecs_pred @ diag_eigvals) # TODO: need to fix. Basically needthe column weighting to happen PER graph and PER set of eigvals
 
 
 def SupervisedEigenvalueLossUnweighted(eigvecs_pred, adj, eigvals_gt):
@@ -247,7 +247,7 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
 
 
     return validation_loss
-g
+
 
 def evaluate_on_test(model, loader, device, config): # low frequency eigval eigvec decomposition 
     
