@@ -40,9 +40,14 @@ def diffusion_transform(data: Data):
         u16 = u16 @ u16
     u2 = u2 @ u0
     u16 = u16 @ u0
-    return torch.stack((u0, u2, u16))
+    return (u0, u2, u16)
 
-def diffusion_convolution(U, data: Data):
+def diffusion_row(data: Data):
+    (u0, u2, u16) = diffusion_transform(data)
+    return torch.cat((u0, u2, u16), dim=1)
+
+def diffusion_convolution(data: Data):
+    U = torch.stack(diffusion_transform(data))
     h = []
     for k in range(U.shape[0]):
         h_k = U[k] @ data.edge_index
@@ -336,8 +341,9 @@ class DataEmbeddings:
     def __call__(self, data: Data) -> Data:
         # BUILDING EMBEDDINGS
         t1 = time.time()
+        if self.config.diffusion_row:
+            data.diffusion_row = diffusion_row(data)
         if self.config.diffusion_emb:
-            U = diffusion_transform(data)
             data.diffusion_emb = diffusion_convolution(U, data)
             # data.x = torch.cat((data.x, diffusion_convolution(U, data)), dim=-1)
         t2 = time.time()
@@ -380,6 +386,9 @@ class DataEmbeddings:
 
         if self.config.diffusion_emb:
             data.x = torch.cat((data.x, data.diffusion_emb), dim=-1)
+        
+        if self.config.diffusion_row:
+            data.x = torch.cat((data.x, data.diffusion_row), dim=-1)
 
         if self.config.wavelet_emb:
             data.x = torch.cat((data.x, data.wavelet_emb), dim=-1)

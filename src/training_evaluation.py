@@ -289,18 +289,19 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
     if not config.multiple_runs:
         print(f"Total training time: {t_end-t_start:.2f} seconds")
 
-    plot_results(config, validation_loss_hist, train_loss_hist, model, device, val_loader)
+    plot_results(config, model, device, val_loader, validation_loss_hist, train_loss_hist,)
 
     return validation_loss_hist
 
-def plot_results(config, validation_loss_hist, train_loss_hist, model, device, val_loader):
-    fig = plt.figure()
-    ax = fig.add_subplot(1, 1, 1)
-    ax.plot(range(1, config.epochs + 1), validation_loss_hist, color='tab:blue', label='validation')
-    ax.plot(range(1, config.epochs + 1), train_loss_hist, color='tab:orange', label='training')
-    ax.set(xlabel='Epoch', ylabel='Loss', title=f"{config.loss_function} Loss History")
-    ax.legend()
-    fig.savefig(f"plots/{config.model}_{config.loss_function}_{date.today()}/loss_plots.png")
+def plot_results(config, model, device, val_loader, validation_loss_hist=None, train_loss_hist=None):
+    if config.train:
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        ax.plot(range(1, config.epochs + 1), validation_loss_hist, color='tab:blue', label='validation')
+        ax.plot(range(1, config.epochs + 1), train_loss_hist, color='tab:orange', label='training')
+        ax.set(xlabel='Epoch', ylabel='Loss', title=f"{config.loss_function} Loss History")
+        ax.legend()
+        fig.savefig(f"plots/{config.model}_{config.loss_function}_{date.today()}/loss_plots.png")
 
     sample_data = None
     for data in val_loader:  
@@ -310,13 +311,15 @@ def plot_results(config, validation_loss_hist, train_loss_hist, model, device, v
     inds = torch.argwhere(sample_data.batch == 0).tolist()
     model.to(device)
     sample_data.to(device)
-    evecs_pred = model(sample_data.x, data.edge_index)[:len(inds), :]
+    evecs_pred = model(sample_data.x, data.edge_index)
+    evecs_pred = normalize_by_batch(evecs_pred, sample_data.batch)[:len(inds), :]
 
     evecs_gt = sample_data.eigvecs[:len(inds), :]
     sort_inds = torch.argsort(evecs_gt[:, 1]).tolist()
     evecs_gt = evecs_gt[sort_inds]
 
     evecs_pred = evecs_pred[sort_inds, :]
+    print(evecs_pred[:2])
 
 
     fig_i, axs = plt.subplots(15, 2, figsize=(20, 45), sharex=True)
@@ -324,7 +327,10 @@ def plot_results(config, validation_loss_hist, train_loss_hist, model, device, v
     for i in range(15):
         for j in [0, 1]:
             ax = axs[i, j]
-            ax.plot(evecs_pred[:, k].cpu().detach().numpy(), color='tab:blue', label='prediction')
+            m = 1
+            if torch.dot(evecs_pred[:, k], evecs_gt[:, k]) < 0:
+                m = -1
+            ax.plot(m * evecs_pred[:, k].cpu().detach().numpy(), color='tab:blue', label='prediction')
             ax.plot(evecs_gt[:, k].cpu().detach().numpy(), color='tab:orange', label='ground truth')
             if i == 14:
                 ax.set(xlabel='Vertex')
@@ -334,7 +340,7 @@ def plot_results(config, validation_loss_hist, train_loss_hist, model, device, v
             k += 1
         handles, labels = ax.get_legend_handles_labels()
     fig_i.suptitle("First 30 Eigenvectors")
-    fig_i.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.95))
+    fig_i.legend(handles, labels, loc='upper center')#, bbox_to_anchor=(0.5, 0.95))
     fig_i.savefig(f"plots/{config.model}_{config.loss_function}_{date.today()}/eigvecs.png")
 
 
@@ -353,7 +359,9 @@ def evaluate(model, loader, optimizer, device, config):
     total_num_eigvecs = 0
 
     num_eigvecs = config.num_eigenvectors
-    
+
+
+    plot_results(config, model, device, loader)
 
     for data in tqdm(loader):
         data = data.to(device)

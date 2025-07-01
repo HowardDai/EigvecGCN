@@ -42,6 +42,8 @@ parser.add_argument("--lambda_ortho", type=float, default=1)
 
 parser.add_argument("--diffusion_emb",action="store_true")
 
+parser.add_argument("--diffusion_row",action="store_true")
+
 parser.add_argument("--wavelet_emb",action="store_true")
 # Choose two nodes, dirac at each, wavelets at varied powers 
 
