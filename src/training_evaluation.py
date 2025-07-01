@@ -107,7 +107,7 @@ def SupervisedEigenvalueLossUnweighted(eigvecs_pred, adj, eigvals_gt, batch):
         inds = list(torch.argwhere(batch == i).squeeze())
 
         lap = L[inds][:, inds]
-        eigvals_gt_inv = torch.inv(eigvals_gt)
+        eigvals_gt_inv = torch.reciprocal(eigvals_gt)
         evecs_pred = eigvecs_pred[inds, :]
         diag_eigvals_inv = torch.diag(eigvals_gt_inv[eigval_inds])
 
@@ -189,13 +189,7 @@ def validate(model, loader, optimizer, device, config):
             loss = config.lambda_energy * EnergyLoss(out, data.edge_index)
         if config.loss_function == 'supervised_eigval':
             loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals, data.batch)
-<<<<<<< HEAD
         if config.loss_function == 'supervised_mse': 
-=======
-        if config.loss_function == 'supervised_eigval_unweighted':
-            loss = SupervisedEigenvalueLossUnweighted(out, data.edge_index, data.eigvals, data.batch)
-        if config.loss_function == 'supervised_mse':
->>>>>>> 40531fbb4bca2e7d8ec6a31fc0ab9d643b808573
             loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
         if config.loss_function == 'supervised_lap_reconstruction':
             loss = lap_reconstruction_loss(out, data.eigvals[:config.num_eigenvectors], data.eigvecs[:, :config.num_eigenvectors], data.edge_index)
