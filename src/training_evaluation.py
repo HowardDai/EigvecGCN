@@ -325,7 +325,10 @@ def plot_results(config, validation_loss_hist, train_loss_hist, model, device, v
     for i in range(15):
         for j in [0, 1]:
             ax = axs[i, j]
-            ax.plot(evecs_pred[:, k].cpu().detach().numpy(), color='tab:blue', label='prediction')
+            m = 1
+            if torch.dot(evecs_pred[:, k], evecs_gt[:, k]) < 0:
+                m = -1
+            ax.plot(m * evecs_pred[:, k].cpu().detach().numpy(), color='tab:blue', label='prediction')
             ax.plot(evecs_gt[:, k].cpu().detach().numpy(), color='tab:orange', label='ground truth')
             if i == 14:
                 ax.set(xlabel='Vertex')
@@ -335,7 +338,7 @@ def plot_results(config, validation_loss_hist, train_loss_hist, model, device, v
             k += 1
         handles, labels = ax.get_legend_handles_labels()
     fig_i.suptitle("First 30 Eigenvectors")
-    fig_i.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.95))
+    fig_i.legend(handles, labels, loc='upper center')#, bbox_to_anchor=(0.5, 0.95))
     fig_i.savefig(f"plots/{config.model}_{config.loss_function}_{date.today()}/eigvecs.png")
 
 
