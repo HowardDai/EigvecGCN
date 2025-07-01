@@ -411,6 +411,7 @@ class DataTransform:
         # data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
         # embeddings = DataEmbeddings(self.config)
         # data = embeddings(data)
+        
         return data
 
 def enumerate_labels(labels):

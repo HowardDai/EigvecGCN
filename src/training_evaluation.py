@@ -192,7 +192,7 @@ def validate(model, loader, optimizer, device, config):
         if config.loss_function == 'supervised_mse': 
             loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
         if config.loss_function == 'supervised_lap_reconstruction':
-            loss = lap_reconstruction_loss(out, data.eigvals[:config.num_eigenvectors], data.eigvecs[:, :config.num_eigenvectors], data.edge_index)
+            loss = lap_reconstruction_loss(out, data.eigvals, data.eigvecs[:, :config.num_eigenvectors], data.edge_index, data.batch)
 
         ortho_loss = config.lambda_ortho * OrthogonalityLoss(out)
 
