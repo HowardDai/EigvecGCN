@@ -54,7 +54,10 @@ if __name__ == "__main__":
 
 
     
-
+    
+    os.makedirs(config.checkpoint_folder, exist_ok=True)
+    os.makedirs('plots', exist_ok=True)
+    os.makedirs(f"plots/{config.model}_{config.loss_function}_{date.today()}", exist_ok=True)
 
 
     if config.train:
