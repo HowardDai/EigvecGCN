@@ -289,18 +289,19 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
     if not config.multiple_runs:
         print(f"Total training time: {t_end-t_start:.2f} seconds")
 
-    plot_results(config, validation_loss_hist, train_loss_hist, model, device, val_loader)
+    plot_results(config, model, device, val_loader, validation_loss_hist, train_loss_hist,)
 
     return validation_loss_hist
 
-def plot_results(config, validation_loss_hist, train_loss_hist, model, device, val_loader):
-    fig = plt.figure()
-    ax = fig.add_subplot(1, 1, 1)
-    ax.plot(range(1, config.epochs + 1), validation_loss_hist, color='tab:blue', label='validation')
-    ax.plot(range(1, config.epochs + 1), train_loss_hist, color='tab:orange', label='training')
-    ax.set(xlabel='Epoch', ylabel='Loss', title=f"{config.loss_function} Loss History")
-    ax.legend()
-    fig.savefig(f"plots/{config.model}_{config.loss_function}_{date.today()}/loss_plots.png")
+def plot_results(config, model, device, val_loader, validation_loss_hist=None, train_loss_hist=None):
+    if config.train:
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        ax.plot(range(1, config.epochs + 1), validation_loss_hist, color='tab:blue', label='validation')
+        ax.plot(range(1, config.epochs + 1), train_loss_hist, color='tab:orange', label='training')
+        ax.set(xlabel='Epoch', ylabel='Loss', title=f"{config.loss_function} Loss History")
+        ax.legend()
+        fig.savefig(f"plots/{config.model}_{config.loss_function}_{date.today()}/loss_plots.png")
 
     sample_data = None
     for data in val_loader:  
@@ -318,6 +319,7 @@ def plot_results(config, validation_loss_hist, train_loss_hist, model, device, v
     evecs_gt = evecs_gt[sort_inds]
 
     evecs_pred = evecs_pred[sort_inds, :]
+    print(evecs_pred[:2])
 
 
     fig_i, axs = plt.subplots(15, 2, figsize=(20, 45), sharex=True)
@@ -357,7 +359,9 @@ def evaluate(model, loader, optimizer, device, config):
     total_num_eigvecs = 0
 
     num_eigvecs = config.num_eigenvectors
-    
+
+
+    plot_results(config, model, device, loader)
 
     for data in tqdm(loader):
         data = data.to(device)
