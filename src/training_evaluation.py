@@ -9,6 +9,11 @@ from tqdm import tqdm
 
 from utils import *
 
+import matplotlib.pyplot as plt
+from datetime import datetime, date
+
+import random
+
 def SupervisedLoss(evecs_pred, evecs_gt):
     return torch.norm(evecs_pred - evecs_gt)
 
@@ -116,6 +121,30 @@ def SupervisedEigenvalueLossUnweighted(eigvecs_pred, adj, eigvals_gt, batch):
         eigval_inds = eigval_inds + 30
     return loss
 
+def compute_loss(config, out, data):
+    if config.forced_ortho:
+        out = orthogonalize_by_batch(out, data.batch)
+    out = normalize_by_batch(out, data.batch)
+
+    if config.loss_function == 'energy':
+        loss = config.lambda_energy * EnergyLoss(out, data.edge_index) 
+    if config.loss_function == 'supervised_eigval':
+        loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals, data.batch)
+    if config.loss_function == 'supervised_eigval_unweighted':
+        loss = SupervisedEigenvalueLossUnweighted(out, data.edge_index, data.eigvals, data.batch)
+    if config.loss_function == 'supervised_mse':
+            loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
+    if config.loss_function == 'supervised_lap_reconstruction':
+        loss = lap_reconstruction_loss(out, data.eigvals, data.eigvecs[:, :config.num_eigenvectors], data.edge_index, data.batch)
+
+        
+    ortho_loss = config.lambda_ortho * OrthogonalityLoss(out)
+
+
+    loss += ortho_loss 
+
+    return loss, ortho_loss
+
 
 def train(model, loader, optimizer, device, config):
     model.to(device)
@@ -126,34 +155,10 @@ def train(model, loader, optimizer, device, config):
 
     for data in tqdm(loader):
         data = data.to(device)
-        # data.x = data.x.float()
-        # data.edge_index = data.edge_index.float()
-        # print(data.x.shape)
-        # print(data.edge_index.shape)
-        # print(data.num_nodes)
         out = model(data.x, data.edge_index)
-        # print(out)
-        if config.forced_ortho:
-            out = orthogonalize_by_batch(out, data.batch)
-        out = normalize_by_batch(out, data.batch)
 
-        if config.loss_function == 'energy':
-            loss = config.lambda_energy * EnergyLoss(out, data.edge_index) 
-        if config.loss_function == 'supervised_eigval':
-            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals, data.batch)
-        if config.loss_function == 'supervised_eigval_unweighted':
-            loss = SupervisedEigenvalueLossUnweighted(out, data.edge_index, data.eigvals, data.batch)
-        if config.loss_function == 'supervised_mse':
-            loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
-        if config.loss_function == 'supervised_lap_reconstruction':
-            loss = lap_reconstruction_loss(out, data.eigvals, data.eigvecs[:, :config.num_eigenvectors], data.edge_index, data.batch)
-
+        loss, ortho_loss = compute_loss(config, out, data)
         
-        ortho_loss = config.lambda_ortho * OrthogonalityLoss(out)
-
-
-        loss += ortho_loss 
-
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -162,8 +167,6 @@ def train(model, loader, optimizer, device, config):
         batch_size = int(data.batch.max()) + 1
         total_loss += loss.item()
         total_ortho_loss += ortho_loss.item()
-
-
 
     total_loss = total_loss / len(loader.dataset)
     total_ortho_loss = total_ortho_loss / len(loader.dataset)
@@ -184,22 +187,7 @@ def validate(model, loader, optimizer, device, config):
 
         out = normalize_by_batch(out, data.batch)
 
-
-        if config.loss_function == 'energy':
-            loss = config.lambda_energy * EnergyLoss(out, data.edge_index)
-        if config.loss_function == 'supervised_eigval':
-            loss = SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals, data.batch)
-        if config.loss_function == 'supervised_eigval_unweighted':
-            loss = SupervisedEigenvalueLossUnweighted(out, data.edge_index, data.eigvals, data.batch)
-        if config.loss_function == 'supervised_mse':
-            loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
-        if config.loss_function == 'supervised_lap_reconstruction':
-            loss = lap_reconstruction_loss(out, data.eigvals, data.eigvecs[:, :config.num_eigenvectors], data.edge_index, data.batch)
-
-        ortho_loss = config.lambda_ortho * OrthogonalityLoss(out)
-
-
-        loss += ortho_loss 
+        loss, ortho_loss = compute_loss(config, out, data)
             
         batch_size = int(data.batch.max()) + 1
         total_loss += loss.item()
@@ -213,11 +201,9 @@ def validate(model, loader, optimizer, device, config):
 
 def training_loop(model, train_loader, val_loader, optimizer, device, config):
 
-
-
-
     # validation_acc = []
-    validation_loss = []
+    validation_loss_hist = []
+    train_loss_hist = []
 
 
     best_val_loss = float('inf')
@@ -234,11 +220,13 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
         
         train_loss, train_loss_ortho = train(model, train_loader, optimizer, device, config)
 
+        train_loss_hist.append(train_loss)
+
         with torch.no_grad():
             
             val_loss, val_loss_ortho = validate(model, val_loader, optimizer, device, config)
 
-            validation_loss.append(val_loss)
+            validation_loss_hist.append(val_loss)
 
 
             if val_loss < best_val_loss:
@@ -272,9 +260,54 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
     if not config.multiple_runs:
         print(f"Total training time: {t_end-t_start:.2f} seconds")
 
+    plot_results(config, validation_loss_hist, train_loss_hist, model, device, val_loader)
+
+    return validation_loss_hist
+
+def plot_results(config, validation_loss_hist, train_loss_hist, model, device, val_loader):
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    ax.plot(range(1, config.epochs + 1), validation_loss_hist, color='tab:blue', label='validation')
+    ax.plot(range(1, config.epochs + 1), train_loss_hist, color='tab:orange', label='training')
+    ax.set(xlabel='Epoch', ylabel='Loss', title=f"{config.loss_function} Loss History")
+    ax.legend()
+    fig.savefig(f"plots/{config.model}_{config.loss_function}_{date.today()}/loss_plots.png")
+
+    sample_data = None
+    for data in val_loader:  
+        sample_data = data
+        break
+
+    inds = torch.argwhere(sample_data.batch == 0).tolist()
+    model.to(device)
+    sample_data.to(device)
+    evecs_pred = model(sample_data.x, data.edge_index)[:len(inds), :]
+
+    evecs_gt = sample_data.eigvecs[:len(inds), :]
+    sort_inds = torch.argsort(evecs_gt[:, 1]).tolist()
+    evecs_gt = evecs_gt[sort_inds]
+
+    evecs_pred = evecs_pred[sort_inds, :]
 
 
-    return validation_loss
+    fig_i, axs = plt.subplots(15, 2, figsize=(20, 45), sharex=True)
+    k = 0
+    for i in range(15):
+        for j in [0, 1]:
+            ax = axs[i, j]
+            ax.plot(evecs_pred[:, k].cpu().detach().numpy(), color='tab:blue', label='prediction')
+            ax.plot(evecs_gt[:, k].cpu().detach().numpy(), color='tab:orange', label='ground truth')
+            if i == 14:
+                ax.set(xlabel='Vertex')
+            if j == 0:
+                ax.set(ylabel='Eigenfunction')
+            ax.set(title=f"Phi {k + 1}")
+            k += 1
+        handles, labels = ax.get_legend_handles_labels()
+    fig_i.suptitle("First 30 Eigenvectors")
+    fig_i.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.95))
+    fig_i.savefig(f"plots/{config.model}_{config.loss_function}_{date.today()}/eigvecs.png")
+
 
 
 def evaluate(model, loader, optimizer, device, config):
