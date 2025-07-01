@@ -390,7 +390,7 @@ def evaluate(model, loader, optimizer, device, config):
 
     print("k: ", num_eigvecs)
     print("average eigval: ", (total_eigval_sum / total_num_eigvecs).item() )
-    
+    print("Size of test set: ", (len(loader.dataset)))
     for loss_function in loss_dict:
         loss_dict[loss_function] =  loss_dict[loss_function] / len(loader.dataset)
         print(loss_function, ": ", loss_dict[loss_function])
