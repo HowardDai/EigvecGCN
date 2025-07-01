@@ -9,8 +9,22 @@ from tqdm import tqdm
 
 from utils import *
 
-def SupervisedLoss(evecs_pred, evecs_gt):
-    return torch.norm(evecs_pred - evecs_gt)
+def SupervisedLoss(evecs_pred, evecs_gt, batch):
+
+
+    eigval_inds = torch.arange(300, dtype=torch.long, device=adj.device)
+    total_mse = 0
+
+    for i in range(batch[-1] + 1):
+        inds = list(torch.argwhere(batch == i).squeeze())
+
+        evecs_pred = eigvecs_pred[inds, :]
+
+        total_mse += torch.norm(evecs_pred - evecs_gt[eigval_inds, :][:evecs_pred.shape[0]]) ** 2
+
+        eigval_inds = eigval_inds + 300
+    
+    return total_mse
 
 
 def EnergyLoss(eigvecs, adj, weights=None):
@@ -280,9 +294,16 @@ def evaluate(model, loader, optimizer, device, config):
 
     total_loss = 0
     total_ortho_loss = 0
-    loss_dict = {'energy': 0, 'supervised_eigval': 0, 'supervised_eigval_unweighted': 0, 'supervised_mse': 0, 'supervised_lap_reconstruction': 0, 'ortho': 0}
+    loss_dict = {'energy': 0, 'supervised_eigval': 0, 'supervised_eigval_unweighted': 0, 'supervised_lap_reconstruction': 0, 'ortho': 0}
     
     total_runtime = 0
+
+
+    total_eigval_sum = 0
+    total_num_eigvecs = 0
+
+    num_eigvecs = config.num_eigenvectors
+    
 
     for data in tqdm(loader):
         data = data.to(device)
@@ -306,18 +327,24 @@ def evaluate(model, loader, optimizer, device, config):
             if loss_function == 'supervised_eigval_unweighted':
                 loss = SupervisedEigenvalueLossUnweighted(out, data.edge_index, data.eigvals, data.batch)
             if loss_function == 'supervised_mse':
-                loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors])
+                loss = SupervisedLoss(out, data.eigvecs[:, :config.num_eigenvectors], data.batch)
             if loss_function == 'supervised_lap_reconstruction':
                 loss = lap_reconstruction_loss(out, data.eigvals, data.eigvecs[:, :config.num_eigenvectors], data.edge_index, data.batch)
             if loss_function == 'ortho':
                 loss = OrthogonalityLoss(out)
             loss_dict[loss_function] += loss.item()
-            
 
+        total_eigval_sum += torch.sum(data.eigvals)
+        total_num_eigvecs += num_eigvecs * (data.batch[-1]+1)
+
+    print("k: ", num_eigvecs)
+    print("average eigval: ", (total_eigval_sum / total_num_eigvecs).item() )
+    
     for loss_function in loss_dict:
         loss_dict[loss_function] =  loss_dict[loss_function] / len(loader.dataset)
         print(loss_function, ": ", loss_dict[loss_function])
-        
+    
+    
     avg_runtime = total_runtime / len(loader.dataset)
     print(avg_runtime)
     out_dict = loss_dict
