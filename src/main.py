@@ -14,24 +14,27 @@ import os
 
 
 if __name__ == "__main__":
-   
-
+    
+    if config.load_model != None:
+        assert(os.path.exists(config.load_model))
+    
+    # LOADING DATASET
+    
     dataset, train_loader, val_loader, test_loader = load_data(config)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # model = GCN(1, config.num_eigenvectors, config.dropout, config.use_bias)
-
     sample = dataset[0] 
     input_size = sample.x.shape[-1]
     print("input_size", input_size)
+    
 
     if config.model == 'GCN':
-        model = GCN(input_size, config.num_eigenvectors, config.dropout, config.use_bias) 
+        model = GCN(input_size, config.num_eigenvectors, config.dropout, config.use_bias).to(device)
     elif config.model == "GIN":
-        model = GIN(8, 3, input_size, 60, config.num_eigenvectors, 0.1, True, "Sum", device) # TODO: make these hyperparams configurable in command line 
+        model = GIN(8, 3, input_size, 60, config.num_eigenvectors, 0.1, True, "Sum", device).to(device) # TODO: make these hyperparams configurable in command line 
     elif config.model == "MLP":
-        model = MLP(8, input_size, 60, config.num_eigenvectors)
+        model = MLP(8, input_size, 60, config.num_eigenvectors).to(device)
     else:
         print("Invalid model type")
     
@@ -41,8 +44,14 @@ if __name__ == "__main__":
         print(f"Loading checkpoint: {config.load_model}")
         model.load_state_dict(torch.load(config.load_model, weights_only=True))
 
+
+    os.makedirs(config.checkpoint_folder, exist_ok=True)
+
+
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,
                                  weight_decay=config.weight_decay)
+
+
 
     
     
