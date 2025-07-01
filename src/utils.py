@@ -561,7 +561,10 @@ def load_data(config):
     modified_list = []
     embeddings = DataEmbeddings(config)
 
-    for data in tqdm(dataset[all_indices]):
+
+    subdataset = dataset[all_indices]
+
+    for data in tqdm(subdataset):
         data = embeddings(data)
         modified_list.append(data)
 
@@ -569,15 +572,18 @@ def load_data(config):
     from torch_geometric.data import InMemoryDataset
 
     class CustomGraphDataset(InMemoryDataset):
-        def __init__(self, data_list):
-            super().__init__(root=None)
+        def __init__(self, data_list, transform=None):
+            # super().__init__(root=None, transform=transform)
             self.data_list = data_list
+            if transform not None:
+                self.transform = transform
+            else self.transform = lambda x: x
 
         def len(self):
             return len(self.data_list)
 
-        def get(self, idx):
-            return self.data_list[idx]
+        def get(self, idx): # NOTE: Make sure these transforms actually work as intended 
+            return self.transform(self.data_list[idx])
 
     dataset = CustomGraphDataset(modified_list)
 
