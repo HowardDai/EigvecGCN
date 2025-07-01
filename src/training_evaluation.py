@@ -310,7 +310,8 @@ def plot_results(config, validation_loss_hist, train_loss_hist, model, device, v
     inds = torch.argwhere(sample_data.batch == 0).tolist()
     model.to(device)
     sample_data.to(device)
-    evecs_pred = model(sample_data.x, data.edge_index)[:len(inds), :]
+    evecs_pred = model(sample_data.x, data.edge_index)
+    evecs_pred = normalize_by_batch(evecs_pred, sample_data.batch)[:len(inds), :]
 
     evecs_gt = sample_data.eigvecs[:len(inds), :]
     sort_inds = torch.argsort(evecs_gt[:, 1]).tolist()
