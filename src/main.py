@@ -47,8 +47,8 @@ if __name__ == "__main__":
         print(f"Loading checkpoint: {config.load_model}")
         model.load_state_dict(torch.load(config.load_model, weights_only=True))
 
-
-    os.makedirs(config.checkpoint_folder, exist_ok=True)
+    os.makedirs('checkpoints', exist_ok=True)
+    os.makedirs(f"checkpoints/{config.checkpoint_folder}", exist_ok=True)
 
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,
@@ -56,11 +56,11 @@ if __name__ == "__main__":
 
 
 
-    
-    
-    os.makedirs(config.checkpoint_folder, exist_ok=True)
+
+
+
     os.makedirs('plots', exist_ok=True)
-    os.makedirs(f"plots/{config.model}_{config.loss_function}_{date.today()}", exist_ok=True)
+    os.makedirs(f"plots/{checkpoint_folder}", exist_ok=True)
 
 
     if config.train:

@@ -128,10 +128,16 @@ def SupervisedEigenvalueLossUnweighted(eigvecs_pred, adj, eigvals_gt, batch):
         inds = list(torch.argwhere(batch == i).squeeze())
 
         lap = L[inds][:, inds]
+        
         eigvals_gt_inv = torch.reciprocal(eigvals_gt)
         evecs_pred = eigvecs_pred[inds, :]
-        diag_eigvals_inv = torch.diag(eigvals_gt_inv[eigval_inds])
 
+        evecs_pred[:, 0] = torch.zeros_like(evecs_pred[:, 0]) # not considering predictions for the lowest eigval
+        eigvals_gt_inv[eigval_inds][0] = 0 
+
+
+        diag_eigvals_inv = torch.diag(eigvals_gt_inv[eigval_inds])
+        
         loss += torch.norm(lap @ evecs_pred @ diag_eigvals_inv - evecs_pred)
 
         eigval_inds = eigval_inds + 30
@@ -261,7 +267,7 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
 
 
             if val_loss < best_val_loss:
-                torch.save(model.state_dict(), f"{config.checkpoint_folder}/{epoch}.pt")
+                torch.save(model.state_dict(), f"checkpoints/{config.checkpoint_folder}/{epoch}.pt")
                 best_val_loss = val_loss
 
                 out_dict = evaluate(model, val_loader, optimizer, device, config)
@@ -311,7 +317,7 @@ def plot_results(config, model, device, val_loader, validation_loss_hist=None, t
         ax.plot(range(1, config.epochs + 1), train_loss_hist, color='tab:orange', label='training')
         ax.set(xlabel='Epoch', ylabel='Loss', title=f"{config.loss_function} Loss History")
         ax.legend()
-        fig.savefig(f"plots/{config.model}_{config.loss_function}_{date.today()}/loss_plots.png")
+        fig.savefig(f"plots/{config.checkpoint_folder}/loss_plots.png")
 
     sample_data = None
     for data in val_loader:  
@@ -340,10 +346,11 @@ def plot_results(config, model, device, val_loader, validation_loss_hist=None, t
         for j in [0, 1]:
             k += 1
             ax = axs[i, j]
-            m = 1
+    
 
             if torch.dot(evecs_pred[:, k], evecs_gt[:, k]) < 0:
-                m = -1
+    
+                evecs_pred[:, k] = evecs_pred[:, k] * -1
 
             ax.plot(evecs_pred[:, k].cpu().detach().numpy(), color='tab:blue', label='prediction')
             ax.plot(evecs_gt[:, k].cpu().detach().numpy(), color='tab:orange', label='ground truth')
@@ -356,7 +363,7 @@ def plot_results(config, model, device, val_loader, validation_loss_hist=None, t
             
     fig_i.suptitle("First 30 Eigenvectors")
     fig_i.legend(h, l)
-    fig_i.savefig(f"plots/{config.model}_{config.loss_function}_{date.today()}/eigvecs.png")
+    fig_i.savefig(f"plots/{config.checkpoint_folder}/eigvecs.png")
 
 
 
