@@ -314,33 +314,38 @@ def plot_results(config, model, device, val_loader, validation_loss_hist=None, t
     evecs_pred = model(sample_data.x, data.edge_index)
     evecs_pred = normalize_by_batch(evecs_pred, sample_data.batch)[:len(inds), :]
 
+    energies = torch.diag(evecs_pred.T @ get_lap(sample_data.edge_index)[:len(inds), :len(inds)] @ evecs_pred)
+    evecs_inds = torch.argsort(energies)
+
     evecs_gt = sample_data.eigvecs[:len(inds), :]
     sort_inds = torch.argsort(evecs_gt[:, 1]).tolist()
     evecs_gt = evecs_gt[sort_inds]
 
-    evecs_pred = evecs_pred[sort_inds, :]
-    print(evecs_pred[:2])
+    evecs_pred = evecs_pred[sort_inds][:, evecs_inds]
 
 
     fig_i, axs = plt.subplots(15, 2, figsize=(20, 45), sharex=True)
-    k = 0
+    k = -1
     for i in range(15):
         for j in [0, 1]:
+            k += 1
             ax = axs[i, j]
             m = 1
+
             if torch.dot(evecs_pred[:, k], evecs_gt[:, k]) < 0:
                 m = -1
-            ax.plot(m * evecs_pred[:, k].cpu().detach().numpy(), color='tab:blue', label='prediction')
+
+            ax.plot(evecs_pred[:, k].cpu().detach().numpy(), color='tab:blue', label='prediction')
             ax.plot(evecs_gt[:, k].cpu().detach().numpy(), color='tab:orange', label='ground truth')
             if i == 14:
                 ax.set(xlabel='Vertex')
             if j == 0:
                 ax.set(ylabel='Eigenfunction')
             ax.set(title=f"Phi {k + 1}")
-            k += 1
-        handles, labels = ax.get_legend_handles_labels()
+        h, l = ax.get_legend_handles_labels()
+            
     fig_i.suptitle("First 30 Eigenvectors")
-    fig_i.legend(handles, labels, loc='upper center')#, bbox_to_anchor=(0.5, 0.95))
+    fig_i.legend(h, l)
     fig_i.savefig(f"plots/{config.model}_{config.loss_function}_{date.today()}/eigvecs.png")
 
 
