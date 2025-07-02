@@ -40,14 +40,9 @@ def diffusion_transform(data: Data):
         u16 = u16 @ u16
     u2 = u2 @ u0
     u16 = u16 @ u0
-    return (u0, u2, u16)
+    return torch.stack((u0, u2, u16))
 
-def diffusion_row(data: Data):
-    (u0, u2, u16) = diffusion_transform(data)
-    return torch.cat((u0, u2, u16), dim=1)
-
-def diffusion_convolution(data: Data):
-    U = torch.stack(diffusion_transform(data))
+def diffusion_convolution(U, data: Data):
     h = []
     for k in range(U.shape[0]):
         h_k = U[k] @ data.edge_index
@@ -341,9 +336,8 @@ class DataEmbeddings:
     def __call__(self, data: Data) -> Data:
         # BUILDING EMBEDDINGS
         t1 = time.time()
-        if self.config.diffusion_row:
-            data.diffusion_row = diffusion_row(data)
         if self.config.diffusion_emb:
+            U = diffusion_transform(data)
             data.diffusion_emb = diffusion_convolution(U, data)
             # data.x = torch.cat((data.x, diffusion_convolution(U, data)), dim=-1)
         t2 = time.time()
@@ -386,9 +380,6 @@ class DataEmbeddings:
 
         if self.config.diffusion_emb:
             data.x = torch.cat((data.x, data.diffusion_emb), dim=-1)
-        
-        if self.config.diffusion_row:
-            data.x = torch.cat((data.x, data.diffusion_row), dim=-1)
 
         if self.config.wavelet_emb:
             data.x = torch.cat((data.x, data.wavelet_emb), dim=-1)
@@ -494,107 +485,161 @@ def convert_scipy_to_torch_sparse(matrix):
     return matrix
 
 
+from torch_geometric.data import InMemoryDataset
+
+class CustomGraphDataset(InMemoryDataset):
+    def __init__(self, data_list, transform=None):
+        super().__init__(root=None, transform=transform)
+        self.data_list = data_list
+        # if transform not None:
+        #     self.transform = transform
+        # else self.transform = lambda x: x
+
+    def len(self):
+        return len(self.data_list)
+
+    def get(self, idx): # NOTE: Make sure these transforms actually work as intended 
+        return self.data_list[idx]
 
 
 def load_data(config):
 
     # dataset and splits
     
-
+    data_root = 'data'
+    data_name = 'ogbg_ppa'
+    data_path = os.path.join(data_root, data_name)
     
         
     transform = DataTransform(config)
     embeddings = DataEmbeddings(config)
     
-    
-    dataset = PygGraphPropPredDataset(root='data', name='ogbg-ppa', transform=transform, pre_transform=pre_transform)
-    print('data object loaded!')
-
-    # sample = dataset[0]
-    # print(sample)
-
-    split_idx = dataset.get_idx_split()
-
-
-    # sample a fraction of each split
-    seed = 42
     subset_frac = config.use_mini_dataset
-    random.seed(seed)
 
-    def sample_idx(idx_list):
-        n = max(1, int(len(idx_list) * subset_frac))
-        return random.sample(idx_list, n)
 
-    if config.use_mini_dataset < 1:
-        print(f"sampling {subset_frac} of dataset")
-        if os.path.exists(f"data/mini_dataset_indices_{subset_frac}"): # if this subset has already been generated
-            print(f"loading previously generated subset indices...")
-            idx_dict = torch.load(f"data/mini_dataset_indices_{subset_frac}") 
-            temp_train_idx = idx_dict['train']
-            temp_val_idx = idx_dict['valid']
-            temp_test_idx = idx_dict['test']
-        else:
-            temp_train_idx = torch.tensor(sample_idx(split_idx['train'].tolist()))
-            temp_val_idx   = torch.tensor(sample_idx(split_idx['valid'].tolist()))
-            temp_test_idx  = torch.tensor(sample_idx(split_idx['test'].tolist()))
-            idx_dict = {'train': temp_train_idx, 'valid': temp_val_idx, 'test':temp_test_idx}
-            torch.save(idx_dict, f"data/mini_dataset_indices_{subset_frac}")
+    if subset_frac < 1 and os.path.exists(os.path.join(data_path, f"mini_dataset_{subset_frac}")):
+        print(f"Using {subset_frac} of dataset. Loading from previously saved subset")
+        data_dict = torch.load(os.path.join(data_path, f"mini_dataset_{subset_frac}"))
+
         
+    else:
+        dataset = PygGraphPropPredDataset(root=data_root, name='ogbg-ppa', transform=transform, pre_transform=pre_transform)
+        print('data object loaded!')
 
-        all_indices = torch.cat((temp_train_idx, temp_val_idx, temp_test_idx))
+        # sample = dataset[0]
+        # print(sample)
 
-        a = temp_train_idx.shape[0]
-        b= temp_val_idx.shape[0] + a
-        c= temp_test_idx.shape[0] + b 
+        split_idx = dataset.get_idx_split()
 
-        # produces train/val/test indices relative to NEW dataset (after subset)
-        train_idx = torch.arange(start=0, end=a)
-        val_idx = torch.arange(start=a, end=b)
-        test_idx = torch.arange(start=b, end= c)
-        print(a,b,c)
-        print(all_indices.shape)
-        print(split_idx['train'].shape)
-        print(split_idx['valid'].shape)
+
+        # sample a fraction of each split
+        seed = 42
+        
+        random.seed(seed)
+
+        def sample_idx(idx_list):
+            n = max(1, int(len(idx_list) * subset_frac))
+            return random.sample(idx_list, n)
+
+        if subset_frac < 1:
+            print(f"sampling {subset_frac} of dataset")
+            if os.path.exists(os.path.join(data_path, f"mini_dataset_indices_{subset_frac}")): # if the indices for this subset have already been generated
+                print(f"loading previously generated subset indices...")
+                idx_dict = torch.load(f"data/ogbg_ppa/mini_dataset_indices_{subset_frac}") 
+                temp_train_idx = idx_dict['train']
+                temp_val_idx = idx_dict['valid']
+                temp_test_idx = idx_dict['test']
+            else:
+                temp_train_idx = torch.tensor(sample_idx(split_idx['train'].tolist()))
+                temp_val_idx   = torch.tensor(sample_idx(split_idx['valid'].tolist()))
+                temp_test_idx  = torch.tensor(sample_idx(split_idx['test'].tolist()))
+                idx_dict = {'train': temp_train_idx, 'valid': temp_val_idx, 'test':temp_test_idx}
+                torch.save(idx_dict, os.path.join(data_path, f"mini_dataset_indices_{subset_frac}"))
+            
+
+            all_indices = torch.cat((temp_train_idx, temp_val_idx, temp_test_idx))
+
+            a = temp_train_idx.shape[0]
+            b= temp_val_idx.shape[0] + a
+            c= temp_test_idx.shape[0] + b 
+
+            # produces train/val/test indices relative to NEW dataset (after subset)
+            train_idx = torch.arange(start=0, end=a)
+            val_idx = torch.arange(start=a, end=b)
+            test_idx = torch.arange(start=b, end= c)
+            print(a,b,c)
+            print(all_indices.shape)
+            print(split_idx['train'].shape)
+            print(split_idx['valid'].shape)
+
+        
+        else:
+            print("Using full dataset")
+            train_idx = split_idx['train'] 
+            val_idx = split_idx['valid']  
+            test_idx = split_idx['test'] 
+            N = len(dataset)
+            all_indices = torch.arange(start=0, end=N) # basically just all the indices
+
+
+        subdataset = dataset[all_indices]
+        data_dict = {'train': subdataset[train_idx], 'valid': subdataset[val_idx], 'test': subdataset[test_idx]}
+
+
+        if config.use_mini_dataset < 1:
+            torch.save(data_dict, os.path.join(data_path, f"mini_dataset_{subset_frac}"))
 
     
-    else:
-        print("Using full dataset")
-        train_idx = split_idx['train'] 
-        val_idx = split_idx['val']  
-        test_idx = split_idx['test'] 
-        all_indices = torch.sort(torch.cat((train_idx, val_idx, test_idx))) # basically just all the indices
 
 
     # preprocessing embeddings
     print("Processing embeddings...")
-    modified_list = []
-    embeddings = DataEmbeddings(config)
 
-    for data in tqdm(dataset[all_indices]):
-        data = embeddings(data)
-        modified_list.append(data)
+    need_emb = {'train': False, 'valid': False, 'test': False}
+    data_dict_emb = {} 
 
-    # 2) wrap them into a tiny InMemoryDataset
-    from torch_geometric.data import InMemoryDataset
+    if config.train:
+        need_emb['train'] = True
+        need_emb['valid'] = True
 
-    class CustomGraphDataset(InMemoryDataset):
-        def __init__(self, data_list):
-            super().__init__(root=None)
-            self.data_list = data_list
+    if config.test:
+        need_emb['test'] = True
 
-        def len(self):
-            return len(self.data_list)
 
-        def get(self, idx):
-            return self.data_list[idx]
 
-    dataset = CustomGraphDataset(modified_list)
+    for key in data_dict:
+        if not need_emb[key]:
+            print(f"No embeddings needed for {key}")
+            continue
+
+        print(f"Processing embeddings for {key}")
+        modified_list = []
+        embeddings = DataEmbeddings(config)
+        
+        for data in tqdm(data_dict[key]):
+            data = embeddings(data)
+            modified_list.append(data)
+
+        # 2) wrap them into a tiny InMemoryDataset
+        data_dict_emb[key] = CustomGraphDataset(modified_list)
 
     print("Embeddings processed!")
 
-    train_loader = DataLoader(dataset[train_idx], batch_size=32, shuffle=True) # ISSUE: right now this is just concatenating everything in the batch, treating it lke a huge graph
-    val_loader   = DataLoader(dataset[val_idx], batch_size=64, shuffle=False)
-    test_loader  = DataLoader(dataset[test_idx],  batch_size=1, shuffle=False)
+    if 'train' in data_dict_emb.keys():
+        train_loader = DataLoader(data_dict_emb['train'], batch_size=32, shuffle=True) # ISSUE: right now this is just concatenating everything in the batch, treating it lke a huge graph
+    else:
+        train_loader = None
+    if 'valid' in data_dict_emb.keys():
+        val_loader   = DataLoader(data_dict_emb['valid'], batch_size=64, shuffle=False)
+    else:
+        val_loader = None
+    if 'test' in data_dict_emb.keys():
+        test_loader  = DataLoader(data_dict_emb['test'],  batch_size=1, shuffle=False)
+    else:
+        test_loader = None
+
+    
+    
 
 
-    return dataset, train_loader, val_loader, test_loader
+    return data_dict_emb, train_loader, val_loader, test_loader
