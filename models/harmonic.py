@@ -129,3 +129,5 @@ def solve_laplacians_fast(L: torch.Tensor,
         ext_vectors[:, k] = ext_vectors[:, k] / ext_vectors[:, k].norm()
 
     return ext_vectors
+
+
