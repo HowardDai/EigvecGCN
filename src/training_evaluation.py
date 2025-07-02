@@ -14,6 +14,8 @@ from datetime import datetime, date
 
 import random
 
+import csv
+
 def SupervisedLoss(evecs_pred, evecs_gt, batch):
 
 
@@ -262,6 +264,14 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
                 torch.save(model.state_dict(), f"{config.checkpoint_folder}/{epoch}.pt")
                 best_val_loss = val_loss
 
+                out_dict = evaluate(model, val_loader, optimizer, device, config)
+                fieldnames = list(out_dict.keys())
+                csv_file_name = f"plots/{config.model}_{config.loss_function}_{date.today()}/metrics.csv"
+                with open(csv_file_name, 'w', newline='') as csvfile:
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows([out_dict])
+
             if config.use_early_stopping:
                 if val_loss < last_min_val_loss:
                     last_min_val_loss = val_loss
@@ -355,7 +365,7 @@ def evaluate(model, loader, optimizer, device, config):
 
     total_loss = 0
     total_ortho_loss = 0
-    loss_dict = {'energy': 0, 'supervised_eigval': 0, 'supervised_eigval_unweighted': 0, 'supervised_lap_reconstruction': 0, 'ortho': 0}
+    loss_dict = {'energy': 0, 'supervised_eigval': 0, 'supervised_eigval_unweighted': 0, 'supervised_lap_reconstruction': 0, 'ortho': 0, 'procrustes': 0}
     
     total_runtime = 0
 
@@ -365,8 +375,6 @@ def evaluate(model, loader, optimizer, device, config):
 
     num_eigvecs = config.num_eigenvectors
 
-
-    plot_results(config, model, device, loader)
 
     for data in tqdm(loader):
         data = data.to(device)
@@ -395,6 +403,8 @@ def evaluate(model, loader, optimizer, device, config):
                 loss = lap_reconstruction_loss(out, data.eigvals, data.eigvecs[:, :config.num_eigenvectors], data.edge_index, data.batch)
             if loss_function == 'ortho':
                 loss = OrthogonalityLoss(out)
+            if loss_function == 'procrustes':
+                loss = procrustes(data.eigvecs[:, :config.num_eigenvectors], out, data.batch)
             loss_dict[loss_function] += loss.item()
 
         total_eigval_sum += torch.sum(data.eigvals)
@@ -467,6 +477,26 @@ def lap_reconstruction_loss(eigvecs_pred, lambda_gt, evecs_gt, adj, batch):
 
     return loss
 
+def procrustes(evecs_gt, evecs_pred, batch):
+    loss = 0
+    eigvec_start = 0
+    inds_all = [torch.argwhere(batch == i).squeeze().tolist() for i in range(batch[-1] + 1)]
+    for i in range(batch[-1] + 1):
+        inds  = inds_all[i]
+        gt = evecs_gt[eigvec_start : eigvec_start + 300, :]
+        gt = gt[:len(inds)]
+        pred  = evecs_pred[inds]
+
+        M = gt @ pred.T
+        U, S, Vh = torch.linalg.svd(M)
+        R = U @ Vh
+
+        loss += torch.norm(R @ pred - gt)
+        
+        eigvec_start += 300
+
+    return loss
+
 
 def multiple_runs(model, features, labels, adj, indices, config, training_loop, evaluate_on_test):
     train_set_ind, val_set_ind, test_set_ind = indices
@@ -488,5 +518,3 @@ def multiple_runs(model, features, labels, adj, indices, config, training_loop, 
     print(f"ACC:  mean: {np.mean(acc):.2f} | std: {np.std(acc):.2f}")
     print(f"LOSS: mean: {np.mean(loss):.2f} | std: {np.std(loss):.2f}")
     print(f"Total training time: {time.time()-t1:.2f} seconds")
-
-

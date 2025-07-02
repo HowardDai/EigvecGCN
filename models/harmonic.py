@@ -69,7 +69,6 @@ def random_uniform_subset(M: torch.Tensor, k0: int = 1, min_frac: float = 0.01) 
 import torch
 
 
-
 def solve_laplacians_fast(L: torch.Tensor,
                           boundary: list[dict[int, float]]
                          ) -> torch.Tensor:
@@ -87,14 +86,15 @@ def solve_laplacians_fast(L: torch.Tensor,
     Returns:
     --------
     ext_vectors : (n, num_vectors) Tensor
-        Each column k is the extended solution (and then normalized).
+        Each column k is the extended solution from boundary[k]
     """
     n = L.size(0)
     device, dtype = L.device, L.dtype
 
     # 1) Identify boundary nodes B and interior nodes I
     B = list(boundary[0].keys())               # e.g. [0, 3, 7, ...]
-    I = [i for i in range(n) if i not in B]     # the complement
+    B_set = set(B)
+    I = [i for i in range(n) if i not in B_set]     # the complement
 
     num_vectors = len(boundary)
     ext_vectors = torch.zeros((n, num_vectors), dtype=dtype, device=device)
@@ -125,9 +125,22 @@ def solve_laplacians_fast(L: torch.Tensor,
         ext_vectors[I, k] = x_I
         ext_vectors[B, k] = x_B
 
-        # 4e) normalize this column
+        # 4e) normalize the new column
         ext_vectors[:, k] = ext_vectors[:, k] / ext_vectors[:, k].norm()
 
     return ext_vectors
 
 
+"""
+TBD:
+schur_subset
+get_schur_eigvec_approximations
+get_basic_eigvec_approximations
+orthonormalize_first_k_columns
+rayleigh_quotient
+get_predicted_eigenvals
+sort_by_energy
+make_plots
+do_all_runs
+[graph loading]
+"""
