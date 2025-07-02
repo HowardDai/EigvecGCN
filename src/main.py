@@ -24,7 +24,7 @@ if __name__ == "__main__":
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    assert(data_dict_emb.keys() > 0)
+    assert(len(data_dict_emb.keys()) > 0)
 
     sample_set = data_dict_emb[next(iter(data_dict_emb))] # get one of train, valid, test, depending on what exists in the data_dict_emb
     sample = sample_set[0] 
