@@ -129,3 +129,18 @@ def solve_laplacians_fast(L: torch.Tensor,
         ext_vectors[:, k] = ext_vectors[:, k] / ext_vectors[:, k].norm()
 
     return ext_vectors
+
+
+"""
+TBD:
+schur_subset
+get_schur_eigvec_approximations
+get_basic_eigvec_approximations
+orthonormalize_first_k_columns
+rayleigh_quotient
+get_predicted_eigenvals
+sort_by_energy
+make_plots
+do_all_runs
+[graph loading]
+"""
