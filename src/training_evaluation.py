@@ -134,7 +134,7 @@ def SupervisedEigenvalueLossUnweighted(eigvecs_pred, adj, eigvals_gt, batch):
 
         evecs_pred[:, 0] = torch.zeros_like(evecs_pred[:, 0]) # not considering predictions for the lowest eigval
         eigvals_gt_inv[eigval_inds][0] = 0 
-
+        
 
         diag_eigvals_inv = torch.diag(eigvals_gt_inv[eigval_inds])
         
@@ -272,7 +272,7 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
 
                 out_dict = evaluate(model, val_loader, optimizer, device, config)
                 fieldnames = list(out_dict.keys())
-                csv_file_name = f"plots/{config.model}_{config.loss_function}_{date.today()}/metrics.csv"
+                csv_file_name = f"plots/{config.checkpoint_folder}/metrics.csv"
                 with open(csv_file_name, 'w', newline='') as csvfile:
                     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                     writer.writeheader()

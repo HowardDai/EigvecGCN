@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
 
     os.makedirs('plots', exist_ok=True)
-    os.makedirs(f"plots/{checkpoint_folder}", exist_ok=True)
+    os.makedirs(f"plots/{config.checkpoint_folder}", exist_ok=True)
 
 
     if config.train:
