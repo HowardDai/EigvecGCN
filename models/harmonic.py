@@ -40,7 +40,7 @@ def random_uniform_subset(M: torch.Tensor, k0: int = 1, min_frac: float = 0.01) 
     selected = set()
     
     # Symmetrize and raise to the k0-th power
-    Msym = M.contiguou() # TODO: make this symmetrized? torch.maximum does not work
+    Msym = M.contiguous() # TODO: make this symmetrized? torch.maximum does not work
     # torch.matrix_power works for integer powers
     Mexp = torch.matrix_power(Msym, k0)
     
