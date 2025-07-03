@@ -177,7 +177,7 @@ def train(model, loader, optimizer, device, config):
 
     for data in tqdm(loader):
         data = data.to(device)
-        out = model(data.x, data.edge_index)
+        out = model(data.x, data.edge_index, data.batch)
 
         loss, ortho_loss = compute_loss(config, out, data)
         
@@ -203,7 +203,7 @@ def validate(model, loader, optimizer, device, config):
     total_ortho_loss = 0
     for data in tqdm(loader):
         data = data.to(device)
-        out = model(data.x, data.edge_index)
+        out = model(data.x, data.edge_index, data.batch)
         if config.forced_ortho:
             out = orthogonalize_by_batch(out, data.batch)
 
@@ -327,7 +327,7 @@ def plot_results(config, model, device, val_loader, validation_loss_hist=None, t
     inds = torch.argwhere(sample_data.batch == 0).tolist()
     model.to(device)
     sample_data.to(device)
-    evecs_pred = model(sample_data.x, data.edge_index)
+    evecs_pred = model(sample_data.x, data.edge_index, data.batch)
     evecs_pred = normalize_by_batch(evecs_pred, sample_data.batch)[:len(inds), :]
 
     energies = torch.diag(evecs_pred.T @ get_lap(sample_data.edge_index)[:len(inds), :len(inds)] @ evecs_pred)
@@ -367,7 +367,7 @@ def plot_results(config, model, device, val_loader, validation_loss_hist=None, t
 
 
 
-def evaluate(model, loader, optimizer, device, config):
+def evaluate(model, loader, device, config):
     model.eval()
 
     total_loss = 0
@@ -386,7 +386,9 @@ def evaluate(model, loader, optimizer, device, config):
     for data in tqdm(loader):
         data = data.to(device)
         t1 = time.time()
-        out = model(data.x, data.edge_index)
+        out = model(data.x, data.edge_index, data.batch)
+
+        
 
         if config.forced_ortho:
             out = orthogonalize_by_batch(out, data.batch)

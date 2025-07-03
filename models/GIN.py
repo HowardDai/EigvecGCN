@@ -164,7 +164,7 @@ class GIN(nn.Module):
         return h
 
 
-    def forward(self, x, adj):
+    def forward(self, x, adj, batch):
         X_concat = x
         # graph_pool = self.__preprocess_graphpool(batch_graph)
 # 

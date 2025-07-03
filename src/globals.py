@@ -7,7 +7,7 @@ parser = ArgumentParser()
 # parser.add_argument("--cuda", type=bool, default=use_cuda)
 
 # MODEL ARCHITECTURE (some of these are not currently active)
-parser.add_argument("--model", type=str, choices=["GCN", 'GIN', 'MLP'], default='GCN')
+parser.add_argument("--model", type=str, choices=["GCN", 'GIN', 'MLP', 'harmonic'], default='MLP')
 
 parser.add_argument("--hidden_dim", type=int, default=30)
 parser.add_argument("--dropout", type=float, default=0.5)

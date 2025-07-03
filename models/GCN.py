@@ -48,7 +48,7 @@ class GCN(nn.Module):
 
 
 
-    def forward(self, x, adj):
+    def forward(self, x, adj, batch):
         x = F.relu(self.gcn_1(x, adj))
         x = self.dropout(x)
         x = F.relu(self.gcn_2(x, adj))

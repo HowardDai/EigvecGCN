@@ -14,10 +14,11 @@ from scipy import sparse
 
 from typing import List
 
+from utils import *
 
 
 
-def random_uniform_subset(M: torch.Tensor, k0: int = 1, min_frac: float = 0.01) -> list[int]: # TODO: check this
+def random_uniform_subset(M: torch.Tensor, k0: int = 1, min_frac: float = 0.01) -> list[int]: 
     """
     Select a random “uniform” subset of node indices from a square torch tensor M.
     
@@ -39,7 +40,7 @@ def random_uniform_subset(M: torch.Tensor, k0: int = 1, min_frac: float = 0.01) 
     selected = set()
     
     # Symmetrize and raise to the k0-th power
-    Msym = torch.maximum(M, M.t())
+    Msym = M.contiguou() # TODO: make this symmetrized? torch.maximum does not work
     # torch.matrix_power works for integer powers
     Mexp = torch.matrix_power(Msym, k0)
     
@@ -166,8 +167,38 @@ def schur_subset(L: torch.Tensor, kept: List[int]) -> torch.Tensor:
     
     return L_new
 
-def get_schur_eigvec_approximations(L: torch.Tensor):
+def get_schur_eigvec_approximations(M: torch.Tensor, k, subset_function):
+    kept = subset_function(M, k0=1, min_frac=0.2) # Find a subset of the graph
+    L = get_lap(M)
+
+    # Compute schur subset (effective resistance weight updates)
+    L_schur = schur_subset(L, kept) 
+
+    # Find eigenvectors on the schur subset
+    _, eigvecs_schur = torch.eigh(L_schur)
+    eigvecs_schur = eigvecs_schur[:, :k]
+    # harmonically extend
+    d_schurs = [dict(zip(kept, eigvecs_schur[:, i])) for i in range(len(kept))]
+    eff_exts = solve_laplacians_fast(L, d_schurs)
+
+    # eff_exts = eff_exts / norm(eff_exts) # all models get normalized in train loop by default
+
+    return eff_exts 
+
+
+class HarmonicAlgorithm(nn.Module):
+    def __init__(self, output_dim, subset_method="random_uniform_subset"): 
+        
+        super().__init__()
+        self.subset_function = random_uniform_subset
+        self.output_dim = output_dim
     
+    def forward(self, x, edge_index, batch):
+        final_out = torch.zeros(0, self.output_dim)
+        for i in range(batch[-1] + 1):
+            out = get_schur_eigvec_approximations(edge_index, self.output_dim, self.subset_function)
+            final_out = torch.cat(final_out, out, dim=0)
+        return final_out
 
 """
 TBD:

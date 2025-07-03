@@ -3,6 +3,7 @@ sys.path.append("models/")
 from mlp import MLP
 from GCN import GCN
 from GIN import GIN
+from harmonic import HarmonicAlgorithm
 
 from utils import *
 from globals import config
@@ -38,6 +39,8 @@ if __name__ == "__main__":
         model = GIN(8, 3, input_size, 60, config.num_eigenvectors, 0.1, True, "Sum", device).to(device) # TODO: make these hyperparams configurable in command line 
     elif config.model == "MLP":
         model = MLP(8, input_size, 60, config.num_eigenvectors).to(device)
+    elif config.model == "harmonic":
+        model = HarmonicAlgorithm(config.num_eigenvectors)
     else:
         print("Invalid model type")
     
@@ -50,11 +53,9 @@ if __name__ == "__main__":
     os.makedirs('checkpoints', exist_ok=True)
     os.makedirs(f"checkpoints/{config.checkpoint_folder}", exist_ok=True)
 
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,
+    if config.train: # only need if training. This throws error if trying to use HarmonicAlgorithm for training 
+        optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,
                                  weight_decay=config.weight_decay)
-
-
 
 
 
@@ -69,7 +70,7 @@ if __name__ == "__main__":
 
     if config.test:
         print("testing...")
-        evaluate(model, test_loader, optimizer, device, config)
+        evaluate(model, test_loader, device, config)
 
 
 
