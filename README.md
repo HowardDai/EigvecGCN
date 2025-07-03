@@ -2,7 +2,7 @@
 GCN to predict eigenvectors of graph 
 
 
-## Julia installation, for harmonci method (for Nyambura + Benjamin) 
+## Julia installation, for harmonic method (for Nyambura + Benjamin) 
 
 ``` wget https://julialang-s3.julialang.org/bin/linux/x64/1.10/julia-1.10.1-linux-x86_64.tar.gz ```
 
