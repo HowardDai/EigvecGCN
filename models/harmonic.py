@@ -12,6 +12,8 @@ from julia import SparseArrays, Laplacians
 import numpy as np
 from scipy import sparse
 
+from typing import List
+
 
 
 
@@ -131,12 +133,50 @@ def solve_laplacians_fast(L: torch.Tensor,
     return ext_vectors
 
 
+def schur_subset(L: torch.Tensor, kept: List[int]) -> torch.Tensor:
+    """
+    Compute the Schur complement of the block indexed by `kept` in matrix L.
+    
+    Parameters:
+    -----------
+    L : (n, n) torch.Tensor
+        A square matrix (e.g., Laplacian).
+    kept : List[int]
+        The indices to keep (0-based).
+    
+    Returns:
+    --------
+    L_new : (len(kept), len(kept)) torch.Tensor
+        The Schur‐complemented submatrix on `kept`.
+    """
+    n = L.size(0)
+    # interior indices = all indices not in `kept`
+    kept_set = set(kept)
+    v = [i for i in range(n) if i not in kept_set]
+    
+    # extract blocks
+    L_vv = L[v][:, v]         # L[v, v]
+    L_vK = L[v][:, kept]      # L[v, kept]
+    L_Kv = L[kept][:, v]      # L[kept, v]
+    L_KK = L[kept][:, kept]   # L[kept, kept]
+    
+    # Schur complement:  L_KK - L_Kv @ inv(L_vv) @ L_vK
+    inv_Lvv = torch.inverse(L_vv)
+    L_new = L_KK - (L_Kv @ inv_Lvv @ L_vK)
+    
+    return L_new
+
+def get_schur_eigvec_approximations(L: torch.Tensor):
+    
+
 """
 TBD:
 schur_subset
 get_schur_eigvec_approximations
+
+
 get_basic_eigvec_approximations
-orthonormalize_first_k_columns
+orthonormalize_first_k_columns 
 rayleigh_quotient
 get_predicted_eigenvals
 sort_by_energy
