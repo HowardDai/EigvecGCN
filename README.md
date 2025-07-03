@@ -13,3 +13,12 @@ Set julia path to this julia (add this to ~/.bashrc to make this automatically h
 
 ``` export PATH="$HOME/julia/julia-1.10.1/bin:$PATH"```
 
+From terminal, install required packages:
+``` julia ```
+``` import Pkg
+Pkg.add("PyCall")          
+Pkg.build("PyCall")
+Pkg.add("Laplacians")      ```
+
+
+
