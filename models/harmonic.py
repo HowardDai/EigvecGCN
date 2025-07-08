@@ -19,6 +19,7 @@ from utils import *
 import scipy.sparse as sp
 
 
+
 def random_uniform_subset(M: torch.Tensor, k0: int = 1, min_frac: float = 0.01) -> list[int]: 
     """
     Select a random “uniform” subset of node indices from a square torch tensor M.
@@ -212,6 +213,12 @@ def get_schur_eigvec_approximations(M: torch.Tensor, k, subset_function):
     return eff_exts 
 
 
+from julia import Main
+
+Main.include("models/harmonic.jl")
+Main.eval("using .Harmonic")
+
+
 class HarmonicAlgorithm(nn.Module):
     def __init__(self, output_dim, subset_method="random_uniform_subset"): 
         
@@ -222,7 +229,7 @@ class HarmonicAlgorithm(nn.Module):
     def forward(self, x, edge_index, batch):
         final_out = torch.zeros(0, self.output_dim)
         for i in range(batch[-1] + 1):
-            out = get_schur_eigvec_approximations(edge_index, self.output_dim, self.subset_function)
+            out = Main.eval("Harmonic.get_schur_eigvec_approximations") # get_schur_eigvec_approximations(edge_index, self.output_dim, self.subset_function)
             final_out = torch.cat(final_out, out, dim=0)
         return final_out
 
