@@ -354,7 +354,7 @@ def evaluate(model, loader, device, config):
 
     total_loss = 0
     total_ortho_loss = 0
-    loss_dict = {'energy': 0, 'supervised_eigval': 0, 'supervised_eigval_unweighted': 0, 'supervised_lap_reconstruction': 0, 'ortho': 0, 'procrustes': 0}
+    loss_dict = {'energy': 0, 'supervised_eigval': 0, 'supervised_eigval_unweighted': 0, 'supervised_lap_reconstruction': 0, 'ortho': 0, 'cosine': 0, 'projection': 0}
     
     total_runtime = 0
 
@@ -394,9 +394,11 @@ def evaluate(model, loader, device, config):
                 loss = lap_reconstruction_loss(out, data.eigvals, data.eigvecs[:, :config.num_eigenvectors], data.edge_index, data.batch, config)
             if loss_function == 'ortho':
                 loss = OrthogonalityLoss(out)
-            if loss_function == 'procrustes':
-                loss = procrustes(data.eigvecs[:, :config.num_eigenvectors], out, data.batch, config)
+            if loss_function == 'cosine':
+                loss = cosine_loss(config, out, data.eigvecs, data.batch)
             loss_dict[loss_function] += loss.item()
+            if loss_function =='projection':
+                loss = projection_loss(config, out, data.eigvecs, data.batch)
 
         total_eigval_sum += torch.sum(data.eigvals)
         total_num_eigvecs += num_eigvecs * (data.batch[-1]+1)
