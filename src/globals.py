@@ -15,6 +15,8 @@ parser.add_argument("--use_bias", type=bool, default=True)
 
 parser.add_argument("--num_eigenvectors", type=float, default=30)
 
+parser.add_argument("--evec_len", type=float, default=300)
+
 
 parser.add_argument("--lr", type=float, default=1e-2)
 parser.add_argument("--weight_decay", type=float, default=5e-3)
@@ -29,7 +31,13 @@ parser.add_argument("--follow_paper", type=bool, default=True)
 
 
 # LOSS FUNCTIONS
-parser.add_argument("--loss_function", type=str, choices=['energy', 'supervised_eigval', 'supervised_eigval_unweighted', 'supervised_lap_reconstruction', 'supervised_mse'], default='energy')
+parser.add_argument("--energy", action="store_true")
+parser.add_argument("--supervised_eigval", action="store_true")
+parser.add_argument("--supervised_eigval_unweighted", action="store_true")
+parser.add_argument("--supervised_lap_reconstruction", action="store_true")
+parser.add_argument("--supervied_mse", action="store_true")
+
+
 # parser.add_argument("--embedding_type", type=str, choices=['diffusion', 'wavelet', 'trivial', 'scatter'], default='trivial')
 
 parser.add_argument("--forced_ortho", action="store_true") 

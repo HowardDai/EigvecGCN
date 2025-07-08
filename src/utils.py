@@ -174,7 +174,7 @@ def wavelet_transform_positional(data: Data, num_scales=10, lazy_parameter=0.5):
 
 
 
-def get_padded_eigvecs(adj: torch.Tensor, max_graph_size: int = 300):
+def get_padded_eigvecs(adj: torch.Tensor, max_graph_size: int):
     """
     Compute eigenvalues/eigenvectors of Laplacian(adj), then
     pad both to size `max_graph_size` with zeros (or trim if larger).
@@ -321,7 +321,7 @@ def get_lap(adj):
 
 def pre_transform(data):  # computes eigvecs eigvals and reformats edge_index
     data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
-    evals, evecs = get_padded_eigvecs(data.edge_index)
+    evals, evecs = get_padded_eigvecs(data.edge_index, config.evec_len)
     data.eigvecs = evecs 
     data.eigvals = evals
  
