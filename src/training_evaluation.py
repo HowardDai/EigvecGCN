@@ -16,8 +16,9 @@ import random
 
 import csv
 
-def SupervisedLoss(evecs_pred, evecs_gt, batch):
+from visualization import *
 
+def SupervisedLoss(evecs_pred, evecs_gt, batch):
 
     eigval_inds = torch.arange(300, dtype=torch.long, device=adj.device)
     total_mse = 0
@@ -270,7 +271,7 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
                 torch.save(model.state_dict(), f"checkpoints/{config.checkpoint_folder}/{epoch}.pt")
                 best_val_loss = val_loss
 
-                out_dict = evaluate(model, val_loader, optimizer, device, config)
+                out_dict = evaluate(model, val_loader, device, config)
                 fieldnames = list(out_dict.keys())
                 csv_file_name = f"plots/{config.checkpoint_folder}/metrics.csv"
                 with open(csv_file_name, 'w', newline='') as csvfile:
@@ -309,61 +310,7 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
 
     return validation_loss_hist
 
-def plot_results(config, model, device, val_loader, validation_loss_hist=None, train_loss_hist=None):
-    if config.train:
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
-        ax.plot(range(1, config.epochs + 1), validation_loss_hist, color='tab:blue', label='validation')
-        ax.plot(range(1, config.epochs + 1), train_loss_hist, color='tab:orange', label='training')
-        ax.set(xlabel='Epoch', ylabel='Loss', title=f"{config.loss_function} Loss History")
-        ax.legend()
-        fig.savefig(f"plots/{config.checkpoint_folder}/loss_plots.png")
 
-    sample_data = None
-    for data in val_loader:  
-        sample_data = data
-        break
-
-    inds = torch.argwhere(sample_data.batch == 0).tolist()
-    model.to(device)
-    sample_data.to(device)
-    evecs_pred = model(sample_data.x, data.edge_index, data.batch)
-    evecs_pred = normalize_by_batch(evecs_pred, sample_data.batch)[:len(inds), :]
-
-    energies = torch.diag(evecs_pred.T @ get_lap(sample_data.edge_index)[:len(inds), :len(inds)] @ evecs_pred)
-    evecs_inds = torch.argsort(energies)
-
-    evecs_gt = sample_data.eigvecs[:len(inds), :]
-    sort_inds = torch.argsort(evecs_gt[:, 1]).tolist()
-    evecs_gt = evecs_gt[sort_inds]
-
-    evecs_pred = evecs_pred[sort_inds][:, evecs_inds]
-
-
-    fig_i, axs = plt.subplots(15, 2, figsize=(20, 45), sharex=True)
-    k = -1
-    for i in range(15):
-        for j in [0, 1]:
-            k += 1
-            ax = axs[i, j]
-    
-
-            if torch.dot(evecs_pred[:, k], evecs_gt[:, k]) < 0:
-    
-                evecs_pred[:, k] = evecs_pred[:, k] * -1
-
-            ax.plot(evecs_pred[:, k].cpu().detach().numpy(), color='tab:blue', label='prediction')
-            ax.plot(evecs_gt[:, k].cpu().detach().numpy(), color='tab:orange', label='ground truth')
-            if i == 14:
-                ax.set(xlabel='Vertex')
-            if j == 0:
-                ax.set(ylabel='Eigenfunction')
-            ax.set(title=f"Phi {k + 1}")
-        h, l = ax.get_legend_handles_labels()
-            
-    fig_i.suptitle("First 30 Eigenvectors")
-    fig_i.legend(h, l)
-    fig_i.savefig(f"plots/{config.checkpoint_folder}/eigvecs.png")
 
 
 

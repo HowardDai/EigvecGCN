@@ -23,7 +23,8 @@ if __name__ == "__main__":
     
     data_dict_emb, train_loader, val_loader, test_loader = load_data(config)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = "cpu"
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     assert(len(data_dict_emb.keys()) > 0)
 

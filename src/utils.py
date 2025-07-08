@@ -520,8 +520,7 @@ def load_data(config):
     if subset_frac < 1 and os.path.exists(os.path.join(data_path, f"mini_dataset_{subset_frac}")):
         print(f"Using {subset_frac} of dataset. Loading from previously saved subset")
         data_dict = torch.load(os.path.join(data_path, f"mini_dataset_{subset_frac}"))
-
-        
+        print("data_dict loaded!")
     else:
         dataset = PygGraphPropPredDataset(root=data_root, name='ogbg-ppa', transform=transform, pre_transform=pre_transform)
         print('data object loaded!')

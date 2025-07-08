@@ -16,6 +16,7 @@ from typing import List
 
 from utils import *
 
+import scipy.sparse as sp
 
 
 def random_uniform_subset(M: torch.Tensor, k0: int = 1, min_frac: float = 0.01) -> list[int]: 
@@ -36,13 +37,23 @@ def random_uniform_subset(M: torch.Tensor, k0: int = 1, min_frac: float = 0.01) 
     subset : list of int
         A list of unique indices in [0, n).
     """
+
     n = M.size(0)
     selected = set()
     
     # Symmetrize and raise to the k0-th power
-    Msym = M.contiguous() # TODO: make this symmetrized? torch.maximum does not work
+    Msym = M # TODO: make this symmetrized? torch.maximum does not work
     # torch.matrix_power works for integer powers
-    Mexp = torch.matrix_power(Msym, k0)
+
+    device = M.device
+
+
+    Mexp = torch.eye(n).to(device)
+
+    for i in range(k0):
+        Mexp = Msym @ Mexp 
+
+    # Mexp = torch.matrix_power(Msym, k0) # using this causes error: unsupported memory format option Contiguous
     
     for i in range(n):
         # neighbors = i itself plus any j where Mexp[i, j] > 0
@@ -110,7 +121,18 @@ def solve_laplacians_fast(L: torch.Tensor,
 
     # 3) Build the fast SDDM solver once
     #    (Julia: sol = approxchol_sddm(sparse(a)))
-    sol = Laplacians.approxchol_sddm(L_II)
+
+    L_II_np = L_II.cpu().numpy()
+
+    # 1.2. Make it a SciPy CSR sparse
+    L_II_csr = sp.csr_matrix(L_II_np)
+
+    # 1.3. Convert that into a Julia SparseMatrixCSC
+    L_II_jl  = SparseArrays.sparse(L_II_csr)
+
+    # 1.4. Now build the solver
+    sol = Laplacians.approxchol_sddm(L_II_jl)
+    # sol = Laplacians.approxchol_sddm(L_II)
 
     # 4) For each right‐hand side (boundary condition)…
     for k, bdict in enumerate(boundary):
@@ -122,7 +144,9 @@ def solve_laplacians_fast(L: torch.Tensor,
         b = - L_IB @ x_B                                    # shape (|I|,)
 
         # 4c) solve approximately for x_I
-        x_I = sol(b, tol=1e-15)                             # shape (|I|,)
+        x_jl = sol(b, tol=1e-15)                             # shape (|I|,)
+        print(type(x_jl))
+        x_I = np.array(x_jl)
 
         # 4d) assemble full solution
         ext_vectors[I, k] = x_I
@@ -175,10 +199,12 @@ def get_schur_eigvec_approximations(M: torch.Tensor, k, subset_function):
     L_schur = schur_subset(L, kept) 
 
     # Find eigenvectors on the schur subset
-    _, eigvecs_schur = torch.eigh(L_schur)
+    _, eigvecs_schur = torch.linalg.eigh(L_schur)
     eigvecs_schur = eigvecs_schur[:, :k]
     # harmonically extend
-    d_schurs = [dict(zip(kept, eigvecs_schur[:, i])) for i in range(len(kept))]
+
+
+    d_schurs = [dict(zip(kept, eigvecs_schur[:,i])) for i in range(k)]
     eff_exts = solve_laplacians_fast(L, d_schurs)
 
     # eff_exts = eff_exts / norm(eff_exts) # all models get normalized in train loop by default
