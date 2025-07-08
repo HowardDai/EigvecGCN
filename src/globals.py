@@ -88,4 +88,4 @@ config = parser.parse_args()
 
 #DATA
 
-parser.add_argument("--data_name", type=str, choices=["ogbg_ppa", 'zinc'])
+parser.add_argument("--dataset", type=str, choices=["ogbg_ppa", 'zinc'])

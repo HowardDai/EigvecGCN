@@ -168,9 +168,8 @@ def cosine_loss(config, eigvecs_pred, eigvecs_gt, batch):
         U_hat = eigves_pred[inds, :]
         U = eigvecs_gt[evec_inds]
         cos_theta = torch.diag(U.T @ U_hat @ U.T @ U_hat.T)
-        theta = torch.acos(cos_theta)
 
-        loss += torch.sum(theta)
+        loss += torch.sum(torch.abs(cos_theta))
         evec_inds += config.evec_len
     
     return loss
