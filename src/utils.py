@@ -27,6 +27,8 @@ import random
 from torch.utils.data import Subset
 from typing import List
 
+from torch_geometric.datasets import ZINC
+
 
 def diffusion_transform(data: Data):
     adj = data.edge_index
@@ -507,7 +509,7 @@ def load_data(config):
     # dataset and splits
     
     data_root = 'data'
-    data_name = 'ogbg_ppa'
+    data_name = config.data_name
     data_path = os.path.join(data_root, data_name)
     
         
@@ -521,8 +523,11 @@ def load_data(config):
         print(f"Using {subset_frac} of dataset. Loading from previously saved subset")
         data_dict = torch.load(os.path.join(data_path, f"mini_dataset_{subset_frac}"))
         print("data_dict loaded!")
-    else:
+    elif config.data_name == 'ogbg_ppa':
         dataset = PygGraphPropPredDataset(root=data_root, name='ogbg-ppa', transform=transform, pre_transform=pre_transform)
+        print('data object loaded!')
+    elif config.data_name == 'zinc':
+        dataset = dataset = ZINC(root =data_root, name='zinc', transform=transform, pre_transform=pre_transform)
         print('data object loaded!')
 
         # sample = dataset[0]

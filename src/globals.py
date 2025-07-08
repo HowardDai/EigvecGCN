@@ -85,3 +85,7 @@ parser.add_argument("--test", action="store_true")
 
 
 config = parser.parse_args()
+
+#DATA
+
+parser.add_argument("--data_name", type=str, choices=["ogbg_ppa", 'zinc'])
