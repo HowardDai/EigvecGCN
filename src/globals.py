@@ -84,8 +84,9 @@ parser.add_argument("--train", action="store_true")
 parser.add_argument("--test", action="store_true")
 
 
-config = parser.parse_args()
-
 #DATA
 
 parser.add_argument("--dataset", type=str, choices=["ogbg_ppa", 'zinc'])
+
+
+config = parser.parse_args()

@@ -320,14 +320,18 @@ def get_lap(adj):
 #     D = torch.sparse_coo_tensor(indices, values, (N, N),
 #                                 device=device)
 #     return D
+class DataPreTransform:
 
-def pre_transform(data):  # computes eigvecs eigvals and reformats edge_index
-    data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
-    evals, evecs = get_padded_eigvecs(data.edge_index, config.evec_len)
-    data.eigvecs = evecs 
-    data.eigvals = evals
+    def __init__(self, config):
+        self.config = config
+    
+    def __call__(self, data: Data) -> Data:
+        data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
+        evals, evecs = get_padded_eigvecs(data.edge_index, self.config.evec_len)
+        data.eigvecs = evecs 
+        data.eigvals = evals
  
-    return data
+        return data
 
 import time
 
@@ -515,6 +519,7 @@ def load_data(config):
         
     transform = DataTransform(config)
     embeddings = DataEmbeddings(config)
+    pre_transform = DataPreTransform(config)
     
     subset_frac = config.use_mini_dataset
 
@@ -527,7 +532,7 @@ def load_data(config):
         dataset = PygGraphPropPredDataset(root=data_root, name='ogbg-ppa', transform=transform, pre_transform=pre_transform)
         print('data object loaded!')
     elif config.dataset == 'zinc':
-        dataset = dataset = ZINC(root =data_root, name='zinc', transform=transform, pre_transform=pre_transform)
+        dataset = dataset = ZINC(root=data_root, transform=transform, pre_transform=pre_transform)
         print('data object loaded!')
 
         # sample = dataset[0]
