@@ -30,149 +30,8 @@ from typing import List
 from torch_geometric.datasets import ZINC
 
 
-def diffusion_transform(data: Data):
-    adj = data.edge_index
-    degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
-    diff_op = adj @ torch.inverse(degree)
-
-    u0 = torch.eye(adj.shape[0])
-    u2 = diff_op @ diff_op
-    u16 = u2
-    for i in range(4):
-        u16 = u16 @ u16
-    u2 = u2 @ u0
-    u16 = u16 @ u0
-    return torch.stack((u0, u2, u16))
-
-def diffusion_convolution(U, data: Data):
-    h = []
-    for k in range(U.shape[0]):
-        h_k = U[k] @ data.edge_index
-        h.append(padding(h_k))
-    h = tuple(h)
-    X = torch.cat(h, dim=1)
-
-    return X
-
-def padding(h_k, length=1000):
-    pad = (0, length - h_k.shape[1])
-    h_k = F.pad(h_k, pad)
-    return h_k
-
-# FOR THE POSITIONAL WAVELET EMBEDDINGS 
-
-from collections import deque
 
 
-
-
-def farthest_node_sparse(adj: torch.sparse_coo_tensor, start: int):
-    """
-    adj: N×N sparse adjacency in COO form
-    start: starting node index
-    returns: (farthest_node, distance)
-    """
-    # make sure we’re in COO and coalesced
-    adj = adj.coalesce()
-    N = adj.size(0)
-    device = adj.device
-
-    # bit‐vectors on nodes
-    visited  = torch.zeros(N, dtype=torch.bool, device=device)
-    dist     = torch.full((N,), -1, dtype=torch.int64, device=device)
-    frontier = torch.zeros(N, dtype=torch.bool, device=device)
-
-    # initialize
-    visited[start]    = True
-    dist[start]       = 0
-    frontier[start]   = True
-    current_distance = 0
-
-    # BFS loop via sparse mm
-    while frontier.any():
-        # propagate to neighbors: adj @ frontier → float counts
-        neigh_counts = torch.sparse.mm(adj, frontier.unsqueeze(1).float()).squeeze(1)
-        # any nonzero → neighbor
-        neigh = neigh_counts > 0
-
-        # new frontier = those neighbors not yet visited
-        new_frontier = neigh & (~visited)
-        if not new_frontier.any():
-            break
-
-        current_distance += 1
-        dist[new_frontier] = current_distance
-        visited |= new_frontier
-        frontier = new_frontier
-
-    # pick the farthest
-    far_node = int(dist.argmax().item())
-    far_dist = int(dist.max().item())
-    return far_node, far_dist
-
-
-def find_diameter_endpoints(adj: torch.sparse_coo_tensor):
-    """
-    Returns (u1, u2) approximate diameter endpoints,
-    by doing 2 runs of farthest_node_sparse.
-    """
-    # start from node 0 (or any arbitrary node)
-    u1, _ = farthest_node_sparse(adj, start=0)
-    u2, _ = farthest_node_sparse(adj, start=u1)
-    return u1, u2
-
-def degree_node_selection(adj: torch.sparse_coo_tensor, k, largest=True):
-    degrees = torch.sum(adj.to_dense(), dim = 0)
-    _, indices = degrees.topk(k, largest=largest)
-    return indices
-
-def generate_wavelet_bank(data: Data, num_scales=10, lazy_parameter=0.5, abs_val = False):
-    adj = data.edge_index
-    degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
-    diff_op = adj @ torch.inverse(degree)
-
-    N = adj.size(0)
-
-    lazy_diff_op = lazy_parameter * torch.eye(N) + (1-lazy_parameter) * diff_op
-
-    diff_op_1 = lazy_diff_op
-    diff_op_2 = None
-
-    filters = ()
-
-    for i in range(num_scales):
-        diff_op_2 = diff_op_1 @ diff_op_1 # iterative squaring
-        wavelet_filter = diff_op_1  - diff_op_2 
-
-        if abs_val:
-            wavelet_filter = torch.abs(wavelet_filter)
-
-        filters = filters + (wavelet_filter,)
-
-        diff_op_1 = diff_op_2 
-
-
-    return filters
-
-
-# Given a graph, computes an pseudo-positional/harmonic embedding on the nodes by the following:
-# 1. Find the two "outermost" nodes
-# 2. For each of the two nodes, run wavelet transform with a starting signal as a dirac on that node, at variable scales
-# 3. 
-def wavelet_transform_positional(data: Data, num_scales=10, lazy_parameter=0.5):
-
-    adj = data.edge_index
-    N = adj.size(0)
-
-    filters = generate_wavelet_bank(data, num_scales=10, lazy_parameter=0.5)
-
-    embs = torch.zeros(N, num_scales)
-    signal = torch.ones(N)
-
-    for i in range(num_scales):
-        embs[:, i] = filters[i] @ signal
-        
-    return embs 
 
 
 
@@ -233,49 +92,6 @@ def all_index_combinations(k: int) -> List[List[int]]:
     return result
 
 
-def scattering_transform(data: Data, num_scales=5, lazy_parameter=0.5, wavelet_inds=[]):
-    filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
-    
-    if len(wavelet_inds) != 0:
-        filters = [filters[i] for i in wavelet_inds]
-    
-    signal = torch.ones(filters[0].shape[0]) / torch.norm(torch.ones(filters[0].shape[0]))
-
-    U = torch.abs(filters[0] @ signal)
-    for i in range(1, len(filters)):
-        U = torch.abs(filters[i] @ U)
-
-
-
-    return U.unsqueeze(dim=-1) # because there is only 1 signal in this case, edit this if more 
-
-def global_scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, num_moments=5, wavelet_inds=[]):
-    filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
-
-    if len(wavelet_inds) != 0:
-        
-        filters = [filters[i] for i in wavelet_inds]
-
-    U = torch.abs(filters[0])
-    for i in range(1, len(filters)):
-        U = torch.abs(filters[i] @ U)
-    
-    
-
-
-    m0 = torch.sum(torch.abs(U), dim=0)
-    
-    moments = torch.unsqueeze(m0, 1)
-
-    for i in range(1, num_moments):
-        m_i = torch.sum(U**(i+1), dim =0)
-        m_i = torch.unsqueeze(m_i, 1)
-        moments = torch.cat((moments, m_i), dim=1)
-    
-    return moments
-
-    
-        
 
         
 
@@ -342,7 +158,7 @@ class DataEmbeddings:
     def __call__(self, data: Data) -> Data:
         # BUILDING EMBEDDINGS
         t1 = time.time()
-        if self.config.diffusion_emb:
+        if self.config.diffusion_emb: # PERM INVARIANCE REQUIRED 
             U = diffusion_transform(data)
             data.diffusion_emb = diffusion_convolution(U, data)
             # data.x = torch.cat((data.x, diffusion_convolution(U, data)), dim=-1)
@@ -383,17 +199,21 @@ class DataEmbeddings:
         t1=time.time()
         data.x = torch.ones(data.num_nodes, 0, dtype=torch.float32)
 
+        self.perms = []
 
-        if self.config.diffusion_emb:
+        if self.config.diffusion_emb: # scales in n, requires random permutations
+            l = data.x.shape[-1]
             data.x = torch.cat((data.x, data.diffusion_emb), dim=-1)
+            r = data.x.shape[-1]
+            self.perms.append([l, r]) # append interval which keeps track of permutations needed
 
-        if self.config.wavelet_emb:
+        if self.config.wavelet_emb: # constant-sized
             data.x = torch.cat((data.x, data.wavelet_emb), dim=-1)
 
-        if self.config.scatter_emb:
+        if self.config.scatter_emb: # constant-sized
             data.x = torch.cat((data.x, data.scatter_emb), dim=-1)
 
-        if self.config.global_scatter_emb:
+        if self.config.global_scatter_emb: # constant-sized
             data.x = torch.cat((data.x, data.global_scatter_emb), dim=-1)
 
 
@@ -417,6 +237,12 @@ class DataTransform:
         # data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
         # embeddings = DataEmbeddings(self.config)
         # data = embeddings(data)
+
+        for interval in data.perms:
+            n = interval[1]-interval[0]
+            rand_indices = torch.randperm(n)
+            rand_indices += interval[0]
+            data.x[interval[0]:interval[1]] = data.x[rand_indices]
         
         return data
 
@@ -524,17 +350,18 @@ def load_data(config):
     subset_frac = config.use_mini_dataset
 
 
-    if subset_frac < 1 and os.path.exists(os.path.join(data_path, f"mini_dataset_{subset_frac}.pt")):
+    if subset_frac < 1 and os.path.exists(os.path.join(data_path, f"mini_{config.dataset}_{subset_frac}.pt")):
         print(f"Using {subset_frac} of dataset. Loading from previously saved subset")
-        data_dict = torch.load(os.path.join(data_path, f"mini_dataset_{subset_frac}.pt"))
+        data_dict = torch.load(os.path.join(data_path, f"mini_{config.dataset}_{subset_frac}.pt"))
         print("data_dict loaded!")
     elif config.dataset == 'ogbg_ppa':
         dataset = PygGraphPropPredDataset(root=data_root, name='ogbg-ppa', transform=transform, pre_transform=pre_transform)
         print('data object loaded!')
     elif config.dataset == 'zinc':
-        dataset = dataset = ZINC(root=data_root, transform=transform, pre_transform=pre_transform)
+        dataset = ZINC(root=data_root, transform=transform, pre_transform=pre_transform)
         print('data object loaded!')
 
+    if config.dataset 
         # sample = dataset[0]
         # print(sample)
 
@@ -552,9 +379,9 @@ def load_data(config):
 
         if subset_frac < 1:
             print(f"sampling {subset_frac} of dataset")
-            if os.path.exists(os.path.join(data_path, f"mini_dataset_indices_{subset_frac}.pt")): # if the indices for this subset have already been generated
+            if os.path.exists(os.path.join(data_path, f"mini_{config.dataset}_indices_{subset_frac}.pt")): # if the indices for this subset have already been generated
                 print(f"loading previously generated subset indices...")
-                idx_dict = torch.load(f"data/ogbg_ppa/mini_dataset_indices_{subset_frac}.pt") 
+                idx_dict = torch.load(f"data/ogbg_ppa/mini_{config.dataset}_indices_{subset_frac}.pt") 
                 temp_train_idx = idx_dict['train']
                 temp_val_idx = idx_dict['valid']
                 temp_test_idx = idx_dict['test']
@@ -563,7 +390,7 @@ def load_data(config):
                 temp_val_idx   = torch.tensor(sample_idx(split_idx['valid'].tolist()))
                 temp_test_idx  = torch.tensor(sample_idx(split_idx['test'].tolist()))
                 idx_dict = {'train': temp_train_idx, 'valid': temp_val_idx, 'test':temp_test_idx}
-                torch.save(idx_dict, os.path.join(data_path, f"mini_dataset_indices_{subset_frac}")) # Note: these indices are saved relative to the FULL dataset 
+                torch.save(idx_dict, os.path.join(data_path, f"mini_{config.dataset}_indices_{subset_frac}")) # Note: these indices are saved relative to the FULL dataset 
             
 
             all_indices = torch.cat((temp_train_idx, temp_val_idx, temp_test_idx))
@@ -644,11 +471,8 @@ def load_data(config):
 
 
     if config.use_mini_dataset < 1:
-        # print("first element of cache_list:", cache_list[0])
-        # torch.save(cache_list[:0], f"cache_list_ZERO_ELEMENTS_{subset_frac}.pt")
-        # torch.save(cache_list[0], os.path.join(data_path, f"cache_list_ONE_ELEMENT{subset_frac}.pt"))
-        # torch.save(cache_list, os.path.join(data_path, f"cache_list_{subset_frac}.pt"))
-        torch.save(data_dict_cache, os.path.join(data_path, f"mini_dataset_{subset_frac}.pt"))
+ 
+        torch.save(data_dict_cache, os.path.join(data_path, f"mini_{config.dataset}_{subset_frac}.pt"))
         print("Mini dataset saved")
     
     print("Embeddings processed!")
