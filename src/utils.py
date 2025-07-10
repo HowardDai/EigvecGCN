@@ -190,6 +190,24 @@ class DataEmbeddings:
             for i in range(len(wavelet_paths)):
                 data.global_scatter_emb = torch.cat((data.scatter_emb, global_scattering_transform(data,wavelet_inds = wavelet_paths[i])), dim=-1)
         t2=time.time()
+
+        t1 = time.time()
+        if self.config.wavelet_moments:
+            data.wavelet_moments = wavelet_moments(data)
+        t2= time.time()
+
+
+        t1 = time.time()
+        if self.config.neighbor_bump:
+            data.neighbor_bump = neighbors_signal(data)
+        t2= time.time()
+
+        t1 = time.time()
+        if self.config.diffused_dirac:
+            data.diffused_dirac = local_diffused_signal(data)
+        t2= time.time()
+
+
         # print("Global scatter runtime:", t2-t1)
         
             # data.x = torch.cat((data.x, global_scattering_transform(data)), dim=-1)
