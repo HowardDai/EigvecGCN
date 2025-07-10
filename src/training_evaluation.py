@@ -151,7 +151,7 @@ def projection_loss(config, eigvecs_pred, eigvecs_gt, batch):
 
     for i in range(batch[-1] + 1):
         inds = list(torch.argwhere(batch == i).squeeze())
-        U_hat = eigves_pred[inds, :]
+        U_hat = eigvecs_pred[inds, :]
         U = eigvecs_gt[evec_inds]
         loss += torch.norm(U.T @ U_hat @ U.T - U_hat.T)
         evec_inds += config.evec_len
@@ -159,22 +159,6 @@ def projection_loss(config, eigvecs_pred, eigvecs_gt, batch):
     return loss
 
 
-def cosine_loss(config, eigvecs_pred, eigvecs_gt, batch):
-    loss = 0
-    evec_inds = torch.arange(config.evec_len, dtype=torch.long, device=batch.device)
-
-    for i in range(batch[-1] + 1):
-        inds = list(torch.argwhere(batch == i).squeeze())
-        U_hat = eigves_pred[inds, :]
-        U = eigvecs_gt[evec_inds]
-        cos_theta = torch.diag(U.T @ U_hat @ U.T @ U_hat.T)
-
-        loss += torch.sum(torch.abs(cos_theta))
-        evec_inds += config.evec_len
-    
-    return loss
-
-        
 
 def compute_loss(config, out, data):
     if config.forced_ortho:
@@ -353,7 +337,7 @@ def evaluate(model, loader, device, config):
 
     total_loss = 0
     total_ortho_loss = 0
-    loss_dict = {'energy': 0, 'supervised_eigval': 0, 'supervised_eigval_unweighted': 0, 'supervised_lap_reconstruction': 0, 'ortho': 0, 'cosine': 0, 'projection': 0}
+    loss_dict = {'energy': 0, 'supervised_eigval': 0, 'supervised_eigval_unweighted': 0, 'supervised_lap_reconstruction': 0, 'ortho': 0, 'projection': 0}
     
     total_runtime = 0
 
@@ -393,8 +377,6 @@ def evaluate(model, loader, device, config):
                 loss = lap_reconstruction_loss(out, data.eigvals, data.eigvecs[:, :config.num_eigenvectors], data.edge_index, data.batch, config)
             if loss_function == 'ortho':
                 loss = OrthogonalityLoss(out)
-            if loss_function == 'cosine':
-                loss = cosine_loss(config, out, data.eigvecs, data.batch)
             loss_dict[loss_function] += loss.item()
             if loss_function =='projection':
                 loss = projection_loss(config, out, data.eigvecs, data.batch)

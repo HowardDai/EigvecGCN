@@ -3,14 +3,19 @@ import random
 from typing import List
 import numpy as np
 
+from torch_geometric.data import Data
+
+import torch.nn as nn
+import torch.nn.functional as F
+
 from utils import *
 
 
 # DIFFUSION TRANSFORM 
 # Node-specific signal (2) x all coordinates (3)
-def diffusion_emb(data:Data):
+def diffusion_emb(data:Data, evec_len=300):
     U = diffusion_transform(data)
-    return diffusion_convolution(U, data)
+    return diffusion_convolution(U, data, evec_len)
 
 
 def diffusion_transform(data: Data):
@@ -26,17 +31,17 @@ def diffusion_transform(data: Data):
     u16 = u16 @ u0
     return torch.stack((u0, u2, u16))
 
-def diffusion_convolution(U, data: Data):
+def diffusion_convolution(U, data: Data, evec_len=300):
     h = []
     for k in range(U.shape[0]):
         h_k = U[k] @ data.edge_index
-        h.append(padding(h_k))
+        h.append(padding(h_k, length=evec_len))
     h = tuple(h)
     X = torch.cat(h, dim=1)
 
     return X
 
-def padding(h_k, length=1000):
+def padding(h_k, length=300):
     pad = (0, length - h_k.shape[1])
     h_k = F.pad(h_k, pad)
     return h_k

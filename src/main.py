@@ -9,6 +9,7 @@ from utils import *
 from globals import config
 from training_evaluation import *
 from visualization import *
+from data import *
 
 import os
 

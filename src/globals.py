@@ -35,7 +35,7 @@ parser.add_argument("--energy", action="store_true")
 parser.add_argument("--supervised_eigval", action="store_true")
 parser.add_argument("--supervised_eigval_unweighted", action="store_true")
 parser.add_argument("--supervised_lap_reconstruction", action="store_true")
-parser.add_argument("--supervied_mse", action="store_true")
+parser.add_argument("--supervised_mse", action="store_true")
 
 
 # parser.add_argument("--embedding_type", type=str, choices=['diffusion', 'wavelet', 'trivial', 'scatter'], default='trivial')
