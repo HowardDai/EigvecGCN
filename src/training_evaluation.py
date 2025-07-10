@@ -147,10 +147,10 @@ def SupervisedEigenvalueLossUnweighted(eigvecs_pred, adj, eigvals_gt, batch, con
 
 def projection_loss(config, eigvecs_pred, eigvecs_gt, batch):
     loss = 0
-    evec_inds = torch.arange(config.evec_len, dtype=torch.long, device=batch.device)
+    evec_inds = 0
 
     for i in range(batch[-1] + 1):
-        inds = 0
+        inds = list(torch.argwhere(batch == i).squeeze())
         U_hat = eigvecs_pred[inds, :]
         U = eigvecs_gt[evec_inds: evec_inds + len(inds)]
         loss += torch.norm(U.T @ U_hat @ U.T - U_hat.T)
