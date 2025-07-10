@@ -229,5 +229,61 @@ def wavelet_emb(data: Data, num_scales=10, lazy_parameter=0.5):
     for i in range(num_scales):
         embs[:, i] = filters[i] @ signal
         
-    return embs 
+    return embs
 
+def wavelet_moments(data: Data, num_moments=4, num_scales=10, lazy_parameter=0.5):
+    adj = data.edge_index
+    N = adj.size(0)
+
+    filters = generate_wavelet_bank(data, num_scales=10, lazy_parameter=0.5)
+    signal = torch.ones(N)
+
+    embs = torch.zeros(N, num_scales * num_moments)
+
+    for filter in filters:
+        i = 0
+        for moment in range(num_moments):
+            embs[:, i] = (filter**moment) @ signal
+             i += 1
+    return embs
+
+
+def neighbors_signal(data: Data, num_scales=10, lazy_parameter=0.5):
+    adj = data.edge_index
+    N = adj.size(0)
+
+    filters = generate_wavelet_bank(data, num_scales=10, lazy_parameter=0.5)
+    signal = torch.ones(N)
+
+    embs = torch.zeros(N, num_scales)
+
+    for i in range(N):
+        for j in range(num_scales):
+            signal = adj[i]
+            embs[i, j] = filters[j, i] @ signal
+
+    return embs
+
+def local_diffused_signal(data: Data, num_scales=10, lazy_parameter=0.5):
+    adj = data.edge_index
+    N = adj.size(0)
+
+    filters = generate_wavelet_bank(data, num_scales=10, lazy_parameter=0.5)
+    signal = torch.zeros(N)
+
+    embs = torch.zeros(N, num_scales)
+
+    adj = data.edge_index
+    degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
+    diff_op = adj @ torch.inverse(degree)
+
+    for i in range(N):
+        for j in range(num_scales):
+            signal = torch.zeros(N)
+            signal[i] += 1
+
+            signal = diff_op @ signal
+
+            embs[i, j] = filters[j, i] @ signal
+
+    return embs
