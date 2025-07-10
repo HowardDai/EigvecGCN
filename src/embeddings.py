@@ -6,12 +6,16 @@ import numpy as np
 from utils import *
 
 
-# DIFFUSION TRANSFORM: 
+# DIFFUSION TRANSFORM 
+# Node-specific signal (2) x all coordinates (3)
+def diffusion_emb(data:Data):
+    U = diffusion_transform(data)
+    return diffusion_convolution(U, data)
+
 
 def diffusion_transform(data: Data):
     adj = data.edge_index
-    degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
-    diff_op = adj @ torch.inverse(degree)
+    diff_op = get_diffusion(adj)
 
     u0 = torch.eye(adj.shape[0])
     u2 = diff_op @ diff_op
@@ -37,12 +41,16 @@ def padding(h_k, length=1000):
     h_k = F.pad(h_k, pad)
     return h_k
 
+
+
+
+
 # FOR THE POSITIONAL WAVELET EMBEDDINGS 
 
 from collections import deque
 
 
-
+# MISC EMBEDDING-BASED UTILS 
 
 def farthest_node_sparse(adj: torch.sparse_coo_tensor, start: int):
     """
@@ -88,9 +96,40 @@ def farthest_node_sparse(adj: torch.sparse_coo_tensor, start: int):
     far_dist = int(dist.max().item())
     return far_node, far_dist
 
+def find_diameter_endpoints(adj: torch.sparse_coo_tensor):
+    """
+    Returns (u1, u2) approximate diameter endpoints,
+    by doing 2 runs of farthest_node_sparse.
+    """
+    # start from node 0 (or any arbitrary node)
+    u1, _ = farthest_node_sparse(adj, start=0)
+    u2, _ = farthest_node_sparse(adj, start=u1)
+    return u1, u2
+
+def degree_node_selection(adj: torch.sparse_coo_tensor, k, largest=True):
+    degrees = torch.sum(adj.to_dense(), dim = 0)
+    _, indices = degrees.topk(k, largest=largest)
+    return indices
 
 
 
+# SCATTER EMBEDDING 
+# Fixed signal (1) x node-specific coordinate (2) 
+def scatter_emb(data, num_scales=5):
+    wavelet_paths = all_index_combinations(num_scales)
+    out = torch.zeros(data.num_nodes, 0, dtype=torch.float32)
+    for i in range(len(wavelet_paths)):
+        out = torch.cat((out, scattering_transform(data,wavelet_inds = wavelet_paths[i])), dim=-1)
+    return out
+
+
+# GLOBAL SCATTER EMBEDDING
+# Node-specific signal (2) x aggregate (1)
+def global_scatter_emb(data, num_scales=5):
+    wavelet_paths = all_index_combinations(num_scales)
+    out = torch.zeros(data.num_nodes, 0, dtype=torch.float32)
+    for i in range(len(wavelet_paths)):
+        out = torch.cat((out, global_scattering_transform(data,wavelet_inds = wavelet_paths[i])), dim=-1)
 
 
 def scattering_transform(data: Data, num_scales=5, lazy_parameter=0.5, wavelet_inds=[]):
@@ -134,25 +173,6 @@ def global_scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, n
     
     return moments
 
-    
-        
-
-
-def find_diameter_endpoints(adj: torch.sparse_coo_tensor):
-    """
-    Returns (u1, u2) approximate diameter endpoints,
-    by doing 2 runs of farthest_node_sparse.
-    """
-    # start from node 0 (or any arbitrary node)
-    u1, _ = farthest_node_sparse(adj, start=0)
-    u2, _ = farthest_node_sparse(adj, start=u1)
-    return u1, u2
-
-def degree_node_selection(adj: torch.sparse_coo_tensor, k, largest=True):
-    degrees = torch.sum(adj.to_dense(), dim = 0)
-    _, indices = degrees.topk(k, largest=largest)
-    return indices
-
 def generate_wavelet_bank(data: Data, num_scales=10, lazy_parameter=0.5, abs_val = False):
     adj = data.edge_index
     degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
@@ -186,7 +206,12 @@ def generate_wavelet_bank(data: Data, num_scales=10, lazy_parameter=0.5, abs_val
 # 1. Find the two "outermost" nodes
 # 2. For each of the two nodes, run wavelet transform with a starting signal as a dirac on that node, at variable scales
 # 3. 
-def wavelet_transform_positional(data: Data, num_scales=10, lazy_parameter=0.5):
+
+# UPDATED: just applying the wavelet to the uniform
+
+# WAVELET EMBEDDING
+# Fixed signal (1) x node-specific coordinate (2) 
+def wavelet_emb(data: Data, num_scales=10, lazy_parameter=0.5):
 
     adj = data.edge_index
     N = adj.size(0)

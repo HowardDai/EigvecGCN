@@ -61,6 +61,8 @@ parser.add_argument("--scatter_emb",action="store_true")
 parser.add_argument("--global_scatter_emb",action="store_true")
 # for each node, dirac, scatter wavelets, and then global moment aggregation 
 
+parser.add_argument("--invariance_transform", type=str, choices=["none", "random", "forcedorder"], default="none")
+
 
 # DATASET LOADING
 parser.add_argument("--use_mini_dataset", type=float, default=1)

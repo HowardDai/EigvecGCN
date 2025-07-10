@@ -125,6 +125,10 @@ def get_lap(adj):
     lap = degree - adj
     return lap
 
+def get_diffusion(adj):
+    degree = torch.diag(torch.sum(adj.to_dense(), dim = 0))
+    return adj @ torch.inverse(degree)
+
 # def get_diag(entries: torch.Tensor):
 #     N = entries.size(0)
 #     device = entries.device
@@ -156,44 +160,33 @@ class DataEmbeddings:
         self.config = config
 
     def __call__(self, data: Data) -> Data:
+
         # BUILDING EMBEDDINGS
         t1 = time.time()
         if self.config.diffusion_emb: # PERM INVARIANCE REQUIRED 
-            U = diffusion_transform(data)
-            data.diffusion_emb = diffusion_convolution(U, data)
-            # data.x = torch.cat((data.x, diffusion_convolution(U, data)), dim=-1)
+            data.diffusion_emb = diffusion_emb(data)
         t2 = time.time()
         # print("Diffusion runtime:", t2-t1)
 
         t1 = time.time()
         if self.config.wavelet_emb:
-            # data.x = torch.cat((data.x, wavelet_transform_positional(data)), dim=-1)
-            data.wavelet_emb = wavelet_transform_positional(data)
+            data.wavelet_emb = wavelet_emb(data)
         t2= time.time() 
         # print("Wavelet runtime:", t2-t1)
 
 
         t1 = time.time()
         if self.config.scatter_emb:
-            # data.x = torch.cat((data.x, scattering_transform(data)), dim=-1)
-            wavelet_paths = all_index_combinations(5)
-            data.scatter_emb = torch.zeros(data.num_nodes, 0, dtype=torch.float32)
-            for i in range(len(wavelet_paths)):
-                data.scatter_emb = torch.cat((data.scatter_emb, scattering_transform(data,wavelet_inds = wavelet_paths[i])), dim=-1)
+            data.scatter_emb = scatter_emb(data)
         t2 = time.time()
         # print("Scatter runtime:", t2-t1)
 
         t1=time.time()
         if self.config.global_scatter_emb:
-            wavelet_paths = custom_wavelet_choices()
-            data.global_scatter_emb = torch.zeros(data.num_nodes, 0, dtype=torch.float32)
-            for i in range(len(wavelet_paths)):
-                data.global_scatter_emb = torch.cat((data.scatter_emb, global_scattering_transform(data,wavelet_inds = wavelet_paths[i])), dim=-1)
+            data.global_scatter_emb = global_scatter_emb(data)
         t2=time.time()
         # print("Global scatter runtime:", t2-t1)
-        
-            # data.x = torch.cat((data.x, global_scattering_transform(data)), dim=-1)
-
+    
 
         # CONCATENATING THE EMBEDDINGS 
         t1=time.time()
@@ -229,7 +222,8 @@ class DataEmbeddings:
         return data
 
 
-class DataTransform:
+
+class RandomTransform:
     def __init__(self, config):
         self.config = config
 
@@ -237,14 +231,58 @@ class DataTransform:
         # data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
         # embeddings = DataEmbeddings(self.config)
         # data = embeddings(data)
-
+        perm_indices = torch.randperm(self.config.evec_len) 
+        
         for interval in data.perms:
+
             n = interval[1]-interval[0]
-            rand_indices = torch.randperm(n)
-            rand_indices += interval[0]
-            data.x[interval[0]:interval[1]] = data.x[rand_indices]
+            assert(n % self.config.evec_len == 0)
+
+            for i in range(int(n / self.config.evec_len)):
+                l = interval[0] + i * self.config.evec_len
+                r = l + self.config.evec_len
+
+                shifted_perm_indices = perm_indices + l
+                print(interval)
+                print(shifted_perm_indices)
+
+                data.x[:, l:r] = data.x[:, shifted_perm_indices]
         
         return data
+
+
+class ForcedOrderTransform:
+    def __init__(self, config):
+        self.config = config
+
+    def __call__(self, data: Data) -> Data:
+        # data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
+        # embeddings = DataEmbeddings(self.config)
+        # data = embeddings(data)
+        adj = data.edge_index
+        diff_op = get_diffusion(adj)
+        for i in range(3):
+            diff_op = diff_op @ diff_op
+
+        perm_indices = torch.argsort(diff_op, dim=0)
+        
+        for interval in data.perms:
+
+            n = interval[1]-interval[0]
+            assert(n % self.config.evec_len == 0)
+
+            for i in range(int(n / self.config.evec_len)):
+                l = interval[0] + i * self.config.evec_len
+                r = l + self.config.evec_len
+
+                shifted_perm_indices = perm_indices + l
+                print(interval)
+                print(shifted_perm_indices)
+                
+                data.x[:, l:r] = data.x[shifted_perm_indices] # TODO: Check if this syntax is right, want to order each column by their respective ordering specified in the column of shifted_perm_indices
+        
+        return data
+
 
 def enumerate_labels(labels):
     """ Converts the labels from the original
@@ -342,8 +380,13 @@ def load_data(config):
     data_name = config.dataset
     data_path = os.path.join(data_root, data_name)
     
-        
-    transform = DataTransform(config)
+    if config.invariance_transform == "none":
+        transform = None
+    elif config.invariance_transform == "random":
+        transform = RandomTransform
+    elif config.invariance_transform == "forcedorder":
+        transform = ForcedOrderTransform
+
     embeddings = DataEmbeddings(config)
     pre_transform = DataPreTransform(config)
     
@@ -461,8 +504,7 @@ def load_data(config):
                 all_indices = torch.arange(start=0, end=N) # basically just all the indices
 
             print("ALL INDICES LENGTH:", all_indices.shape)
-            subdataset = Subset(dataset, all_indices) # subdataset = dataset[all_indices] 
-            subdataset2 = dataset.index_select(all_indices)  
+            subdataset = dataset[all_indices] # subdataset = dataset[all_indices] 
             data_dict = {'train': subdataset[train_idx], 'valid': subdataset[val_idx], 'test': subdataset[test_idx]}
 
 
@@ -531,20 +573,20 @@ def load_data(config):
         torch.save(data_dict_cache, os.path.join(data_path, f"mini_{config.dataset}_{subset_frac}.pt"))
         print("Mini dataset saved")
     
-            print("Embeddings processed!")
+    print("Embeddings processed!")
 
-        if 'train' in data_dict_emb.keys():
-            train_loader = DataLoader(data_dict_emb['train'], batch_size=32, shuffle=True) # ISSUE: right now this is just concatenating everything in the batch, treating it lke a huge graph
-        else:
-            train_loader = None
-        if 'valid' in data_dict_emb.keys():
-            val_loader   = DataLoader(data_dict_emb['valid'], batch_size=64, shuffle=False)
-        else:
-            val_loader = None
-        if 'test' in data_dict_emb.keys():
-            test_loader  = DataLoader(data_dict_emb['test'],  batch_size=1, shuffle=False)
-        else:
-            test_loader = None
+    if 'train' in data_dict_emb.keys():
+        train_loader = DataLoader(data_dict_emb['train'], batch_size=32, shuffle=True) # ISSUE: right now this is just concatenating everything in the batch, treating it lke a huge graph
+    else:
+        train_loader = None
+    if 'valid' in data_dict_emb.keys():
+        val_loader   = DataLoader(data_dict_emb['valid'], batch_size=64, shuffle=False)
+    else:
+        val_loader = None
+    if 'test' in data_dict_emb.keys():
+        test_loader  = DataLoader(data_dict_emb['test'],  batch_size=1, shuffle=False)
+    else:
+        test_loader = None
 
     
     
