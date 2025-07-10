@@ -517,9 +517,9 @@ def load_data(config):
     subset_frac = config.use_mini_dataset
 
 
-    if subset_frac < 1 and os.path.exists(os.path.join(data_path, f"mini_dataset_{subset_frac}")):
+    if subset_frac < 1 and os.path.exists(os.path.join(data_path, f"mini_dataset_{subset_frac}.pt")):
         print(f"Using {subset_frac} of dataset. Loading from previously saved subset")
-        data_dict = torch.load(os.path.join(data_path, f"mini_dataset_{subset_frac}"))
+        data_dict = torch.load(os.path.join(data_path, f"mini_dataset_{subset_frac}.pt"))
         print("data_dict loaded!")
     else:
         dataset = PygGraphPropPredDataset(root=data_root, name='ogbg-ppa', transform=transform, pre_transform=pre_transform)
@@ -542,9 +542,9 @@ def load_data(config):
 
         if subset_frac < 1:
             print(f"sampling {subset_frac} of dataset")
-            if os.path.exists(os.path.join(data_path, f"mini_dataset_indices_{subset_frac}")): # if the indices for this subset have already been generated
+            if os.path.exists(os.path.join(data_path, f"mini_dataset_indices_{subset_frac}.pt")): # if the indices for this subset have already been generated
                 print(f"loading previously generated subset indices...")
-                idx_dict = torch.load(f"data/ogbg_ppa/mini_dataset_indices_{subset_frac}") 
+                idx_dict = torch.load(f"data/ogbg_ppa/mini_dataset_indices_{subset_frac}.pt") 
                 temp_train_idx = idx_dict['train']
                 temp_val_idx = idx_dict['valid']
                 temp_test_idx = idx_dict['test']
@@ -553,7 +553,7 @@ def load_data(config):
                 temp_val_idx   = torch.tensor(sample_idx(split_idx['valid'].tolist()))
                 temp_test_idx  = torch.tensor(sample_idx(split_idx['test'].tolist()))
                 idx_dict = {'train': temp_train_idx, 'valid': temp_val_idx, 'test':temp_test_idx}
-                torch.save(idx_dict, os.path.join(data_path, f"mini_dataset_indices_{subset_frac}"))
+                torch.save(idx_dict, os.path.join(data_path, f"mini_dataset_indices_{subset_frac}")) # Note: these indices are saved relative to the FULL dataset 
             
 
             all_indices = torch.cat((temp_train_idx, temp_val_idx, temp_test_idx))
@@ -580,22 +580,25 @@ def load_data(config):
             N = len(dataset)
             all_indices = torch.arange(start=0, end=N) # basically just all the indices
 
-
-        subdataset = dataset[all_indices]
+        print("ALL INDICES LENGTH:", all_indices.shape)
+        subdataset = Subset(dataset, all_indices) # subdataset = dataset[all_indices] 
+        subdataset2 = dataset.index_select(all_indices)  
         data_dict = {'train': subdataset[train_idx], 'valid': subdataset[val_idx], 'test': subdataset[test_idx]}
 
 
-        if config.use_mini_dataset < 1:
-            torch.save(data_dict, os.path.join(data_path, f"mini_dataset_{subset_frac}"))
+      
 
-    
+
+
 
 
     # preprocessing embeddings
     print("Processing embeddings...")
 
     need_emb = {'train': False, 'valid': False, 'test': False}
+    data_dict_cache = {}
     data_dict_emb = {} 
+    
 
     if config.train:
         need_emb['train'] = True
@@ -612,16 +615,32 @@ def load_data(config):
             continue
 
         print(f"Processing embeddings for {key}")
+        cache_list = []
         modified_list = []
         embeddings = DataEmbeddings(config)
         
         for data in tqdm(data_dict[key]):
+            if config.use_mini_dataset < 1:
+                cache_list.append(data.clone())
             data = embeddings(data)
             modified_list.append(data)
 
         # 2) wrap them into a tiny InMemoryDataset
+        # print("first element of cache_list:", cache_list[0])
+        if config.use_mini_dataset < 1:
+            data_dict_cache[key] = CustomGraphDataset(cache_list)
+
         data_dict_emb[key] = CustomGraphDataset(modified_list)
 
+
+    if config.use_mini_dataset < 1:
+        # print("first element of cache_list:", cache_list[0])
+        # torch.save(cache_list[:0], f"cache_list_ZERO_ELEMENTS_{subset_frac}.pt")
+        # torch.save(cache_list[0], os.path.join(data_path, f"cache_list_ONE_ELEMENT{subset_frac}.pt"))
+        # torch.save(cache_list, os.path.join(data_path, f"cache_list_{subset_frac}.pt"))
+        torch.save(data_dict_cache, os.path.join(data_path, f"mini_dataset_{subset_frac}.pt"))
+        print("Mini dataset saved")
+    
     print("Embeddings processed!")
 
     if 'train' in data_dict_emb.keys():

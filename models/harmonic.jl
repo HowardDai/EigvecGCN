@@ -1,21 +1,24 @@
-module Harmonic
+# module Harmonic
+using PyCall
+using Laplacians, SparseArrays, LinearAlgebra, Random
 
 
-function random_uniform_subset(M; k0=1, min_frac=0.01) # TODO: add k0 parameter for neighborhood depth
+function random_uniform_subset(M; k0=1, min_count=60) # TODO: add k0 parameter for neighborhood depth
     n = size(M)[1]
     random_values = Set{Int}()
     Mexp = max.(M,M')^k0
-    for i in 1:n
+    for i in collect(1:n)
         # compute neighbors
-        nbrs = [
-            [j for j in 1:n if (Mexp[i, j] > 0 || j == i)]]
+        nbrs = 
+            [j for j in 1:n if (Mexp[i, j] > 0 || j == i)]
         if !any(x -> in(x, random_values), nbrs)
+      
             push!(random_values, rand(nbrs)) # randomly add i or a neighbor
         elseif rand() <= 1 / size(nbrs)[1] # chance of adding i anyway
             push!(random_values, i)
         end
     end
-    while length(random_values) < n * min_frac
+    while length(random_values) < min_count
         push!(random_values, rand(1:n))
     end
     return collect(random_values)
@@ -38,7 +41,7 @@ function solve_laplacians_fast(L::AbstractMatrix, boundary::Vector{Dict{Int, Flo
     L_IB = L[I, B]
 
     a = L_II # this is like a Laplacian but with extra degrees counted on diagonal
-    sol = approxchol_sddm(sparse(a))
+    sol = approxchol_sddm(sparse(a), maxits=20, maxtime=30, verbose=true)
 
 
     for k in collect(1:num_vectors)
@@ -46,7 +49,9 @@ function solve_laplacians_fast(L::AbstractMatrix, boundary::Vector{Dict{Int, Flo
       x_B = [boundary_k[i] for i in B]       # Boundary values
       # print(schur_subset(L, B) * x_B ./ x_B)
       b = -1 * L_IB * x_B
-      x_I = sol(b, tol=1e-15)
+      x_I = sol(b, tol=1e-8)
+      print("solved")
+      flush(stdout)
       ext_vectors[I, k] = x_I
       ext_vectors[B,k] = x_B
 
@@ -80,13 +85,20 @@ function schur_subset(L::AbstractMatrix{Float64}, kept::Vector{Int})
 end
 
 
-function get_schur_eigvec_approximations(M::AbstractMatrix{Float64}, subset_indices::Vector{Int})
+function get_schur_eigvec_approximations(M::AbstractMatrix{Float64}, subset_method)
     runtimes = Dict()
+
+    M = sparse(M)
+
     L = lap(M)
   
     t1 = time() #
-    L_schur = schur_subset_fast(L, subset_indices; approxchol_tol=1e-20, JLfac=20)
-    #L_schur = schur_subset(L, subset_indices)
+
+    if subset_method == "random_uniform_subset"
+        subset_indices = random_uniform_subset(M)
+    end
+    # L_schur = schur_subset_fast(L, subset_indices; approxchol_tol=1e-20, JLfac=20)
+    L_schur = schur_subset(L, subset_indices)
     #L_schur = schur_subset_filtered(L, subset_indices)
     #L_schur = schur_subset_fast_subgraphs(L, subset_indices)
     runtimes["Schur"] = time() - t1 #
@@ -108,10 +120,20 @@ function get_schur_eigvec_approximations(M::AbstractMatrix{Float64}, subset_indi
   
   
   
-    print(runtimes)
+    # print(runtimes)
     eff_exts = eff_exts / norm(eff_exts)
-    return eff_exts
-  
-  
-  end
 
+    flush(stdout)
+
+    return Array(eff_exts)
+  
+  
+end
+
+
+
+
+
+# export get_schur_eigvec_approximations
+
+# end
