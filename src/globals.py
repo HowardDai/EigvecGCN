@@ -59,8 +59,13 @@ parser.add_argument("--scatter_emb",action="store_true")
 # Choose two nodes, dirac at each, scatter wavelets
 
 parser.add_argument("--global_scatter_emb",action="store_true")
-# for each node, dirac, scatter wavelets, and then global moment aggregation 
+# for each node, dirac, scatter wavelets, and then global moment aggregation
 
+parser.add_argument("--wavelet_moments",action="store_true")
+ 
+parser.add_argument("--neighbor_bump",action="store_true")
+
+parser.add_argument("--diffused_dirac",action="store_true")
 
 # DATASET LOADING
 parser.add_argument("--use_mini_dataset", type=float, default=1)
