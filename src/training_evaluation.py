@@ -101,17 +101,15 @@ def OrthogonalityLoss(eigvecs):
 
 
 def SupervisedEigenvalueLoss(eigvecs_pred, adj, eigvals_gt, batch, config):
-    L = get_lap(adj)
+    L = get_lap(adj).to_dense()
     loss = 0
     num_eigvals = eigvecs_pred.shape[-1]
 
     eigval_inds = torch.arange(num_eigvals, dtype=torch.long, device=adj.device)
     for i in range(batch[-1] + 1):
-        inds = torch.argwhere(batch == i).squeeze()
-        print(inds)
-        print(L.shape)
-        print(batch.shape)
-        lap = L[inds][:, inds]
+        inds = list(torch.argwhere(batch == i).squeeze())
+
+        lap = L[inds, :][:, inds]
         
         evecs_pred = eigvecs_pred[inds, :]
         diag_eigvals = torch.diag(eigvals_gt[eigval_inds])
@@ -122,7 +120,7 @@ def SupervisedEigenvalueLoss(eigvecs_pred, adj, eigvals_gt, batch, config):
 
 
 def SupervisedEigenvalueLossUnweighted(eigvecs_pred, adj, eigvals_gt, batch, config):
-    L = get_lap(adj)
+    L = get_lap(adj).to_dense()
     loss = 0
     num_eigvals = eigvecs_pred.shape[-1]
 
@@ -131,7 +129,7 @@ def SupervisedEigenvalueLossUnweighted(eigvecs_pred, adj, eigvals_gt, batch, con
     for i in range(batch[-1] + 1):
         inds = list(torch.argwhere(batch == i).squeeze())
 
-        lap = L[inds][:, inds]
+        lap = L[inds, :][:, inds]
         
         eigvals_gt_inv = torch.reciprocal(eigvals_gt)
         evecs_pred = eigvecs_pred[inds, :]
@@ -399,6 +397,7 @@ def evaluate(model, loader, device, config):
     print(avg_runtime)
     out_dict = loss_dict
     out_dict['runtime'] = avg_runtime
+    out_dict['dataset'] = config.dataset
 
     return out_dict
     
