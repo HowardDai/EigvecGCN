@@ -4,6 +4,8 @@ from mlp import MLP
 from GCN import GCN
 from GIN import GIN
 from GIN import GIN2
+from GIN import RecurrentGIN
+
 from harmonic import HarmonicAlgorithm
 
 from utils import *
@@ -13,6 +15,10 @@ from visualization import *
 from data import *
 
 import os
+
+from easydict import EasyDict
+import yaml
+
 
 
 
@@ -44,12 +50,15 @@ if __name__ == "__main__":
     # if config.model == 'GCN':
         
     #     model = GCN(input_size, config.num_eigenvectors, config.dropout, config.use_bias).to(device)
-    elif config.model == "GIN":
+    if config.model == "GIN":
         model_config = config.GIN_params
-        model = GIN(model_config.num_layers, model_config.num_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, model_config.dropout, True, "Sum", device).to(device) # TODO: make these hyperparams configurable in command line 
+        model = GIN(model_config.num_layers, model_config.num_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, model_config.dropout, True, "Sum", device).to(device) 
     elif config.model == "GIN2":
         model_config = config.GIN2_params
-        model = GIN2(model_config.num_layers, model_config.num_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, model_config.global_dim, model_config.dropout, True, "Sum", device).to(device) # TODO: make these hyperparams configurable in command line
+        model = GIN2(model_config.num_layers, model_config.num_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, model_config.global_dim, model_config.dropout, True, "Sum", device).to(device) 
+    elif config.model == "RecurrentGIN":
+        model_config = config.RecurrentGIN_params
+        model = RecurrentGIN(model_config.num_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, model_config.global_dim, model_config.dropout, True, "Sum", device).to(device) # TODO: make these hyperparams configurable in command line
     elif config.model == "MLP":
         model_config = config.MLP_params
         model = MLP(model_config.num_layers, input_size, model_config.hidden_dim, config.num_eigenvectors).to(device)

@@ -1,11 +1,11 @@
-```yaml
+
 # config.yml
 
 # Device
 cuda: true  # override if you wish to disable CUDA
 
 # MODEL ARCHITECTURE
-model: "GIN"               # choices: "GIN", "GIN2", "MLP", "harmonic"
+model: "GIN"               # choices: "GIN", "GIN2", "RecurrentGIN", "MLP", "harmonic"
 GIN_params:
   num_layers: 8
   num_mlp_layers: 3
@@ -19,8 +19,8 @@ GIN2_params:
   dropout: 0.1 
 RecurrentGIN_params: 
   num_mlp_layers: 3
-  hidden_dim: 60
-  global_dim: 10
+  hidden_dim: 30
+  global_dim: 5
   dropout: 0.1 
 MLP_params:
   num_layers: 8
@@ -65,7 +65,7 @@ use_mini_dataset: 1.0
 use_supervised: false
 
 # MODEL LOAD / SAVE PATHS
-checkpoint_folder: "checkpoints"
+checkpoint_folder: ""
 load_model: null                # path to a saved model, or null
 
 # ACTIONS
@@ -76,4 +76,4 @@ test: false
 dataset: "ogbg_ppa"            # choices: "ogbg_ppa", "zinc"
 evec_len: 300
 num_eigenvectors: 30
-```
+

@@ -451,7 +451,7 @@ class RecurrentGIN(nn.Module):
 
         #Linear function that maps the hidden representation at different layers into a prediction score
         self.linears_prediction = torch.nn.ModuleList()
-        for layer in range(num_layers):
+        for layer in range(self.num_layers):
             if layer == 0:
                 self.linears_prediction.append(nn.Linear(input_dim, 1))
             else:
@@ -598,21 +598,20 @@ class RecurrentGIN(nn.Module):
             
             # ADDING GLOBAL EMBEDDINGS TO EACH NODE 
 
-            if layer == self.num_layers-1: # last layer, do not compute the global embeddings 
-                final_h = h
-            else:
+            if layer != self.num_layers-1: # for last layer, do not compute the global embeddings 
                 pooled_h = global_add_pool(h, batch) # using SUM pooling for now, # B x hidden_dim
                 global_h = self.global_mlp(pooled_h) # B x global_dim
                 global_h_per_node = global_h[batch] # N x global_dim
-                final_h = torch.cat((global_h, h), dim=-1) # TODO double check everything here 
+ 
+                h = torch.cat((global_h_per_node, h), dim=-1) # TODO double check everything here 
 
 
-            hidden_rep.append(final_h)
+            hidden_rep.append(h)
 
-        eigvec_preds = torch.zeros(x.shape[0], 0)
+        eigvec_preds = torch.zeros(x.shape[0], 0).to(self.device)
     
         #perform pooling over all nodes in each graph in every layer
         for layer, h in enumerate(hidden_rep):
             # pooled_h = torch.spmm(graph_pool, h)
-            eigvec_preds = torch.cat(self.linears_prediction[layer](h), eigvec_preds, dim=-1)
+            eigvec_preds = torch.cat((self.linears_prediction[layer](h), eigvec_preds), dim=-1)
         return eigvec_preds
