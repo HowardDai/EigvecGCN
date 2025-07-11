@@ -248,7 +248,8 @@ def wavelet_moments_emb(data: Data, num_moments=4, num_scales=10, lazy_parameter
             i += 1
     return embs
 
-
+# NEIGHBORS SIGNAL EMBEDDING
+# Node-specific signal (2) x node-specific signal (2)
 def neighbors_signal_emb(data: Data, num_scales=10, lazy_parameter=0.5):
     adj = data.edge_index
     N = adj.size(0)
@@ -261,9 +262,10 @@ def neighbors_signal_emb(data: Data, num_scales=10, lazy_parameter=0.5):
     for i in range(N):
         for j in range(num_scales):
             signal = adj[i]
-            embs[i, j] = filters[j, i] @ signal
-
+            embs[i, j] = filters[j][i] @ signal # TODO: rewrite with torch functions
     return embs
+
+
 
 def local_diffused_signal_emb(data: Data, num_scales=10, lazy_parameter=0.5):
     adj = data.edge_index
@@ -285,6 +287,6 @@ def local_diffused_signal_emb(data: Data, num_scales=10, lazy_parameter=0.5):
 
             signal = diff_op @ signal
 
-            embs[i, j] = filters[j, i] @ signal
+            embs[i, j] = filters[j][i] @ signal
 
     return embs

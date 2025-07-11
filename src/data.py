@@ -91,7 +91,7 @@ class DataEmbeddings:
         data.x = torch.ones(data.num_nodes, 0, dtype=torch.float32)
         if self.config.diffusion_emb: # PERM INVARIANCE REQUIRED 
             l = data.x.shape[-1]
-            data.x = torch.cat((data.x, data.diffusion_emb), dim=-1)
+            data.x = torch.cat((data.x, diffusion_emb(data)), dim=-1)
             r = data.x.shape[-1]
             data.perms.append([l, r])
 
