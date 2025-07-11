@@ -7,7 +7,7 @@ from GIN import GIN2
 from harmonic import HarmonicAlgorithm
 
 from utils import *
-from globals import config
+from globals import args
 from training_evaluation import *
 from visualization import *
 from data import *
@@ -17,7 +17,12 @@ import os
 
 
 if __name__ == "__main__":
+    config = {}
+    with open(args.config, 'r') as f:
+        config = EasyDict(yaml.safe_load(f))
     
+
+
     if config.load_model != None:
         assert(os.path.exists(config.load_model))
     
@@ -35,15 +40,19 @@ if __name__ == "__main__":
     input_size = sample.x.shape[-1]
     print("input_size", input_size)
     
-
-    if config.model == 'GCN':
-        model = GCN(input_size, config.num_eigenvectors, config.dropout, config.use_bias).to(device)
+    
+    # if config.model == 'GCN':
+        
+    #     model = GCN(input_size, config.num_eigenvectors, config.dropout, config.use_bias).to(device)
     elif config.model == "GIN":
-        model = GIN(8, 3, input_size, 60, config.num_eigenvectors, 0.1, True, "Sum", device).to(device) # TODO: make these hyperparams configurable in command line 
+        model_config = config.GIN_params
+        model = GIN(model_config.num_layers, model_config.num_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, model_config.dropout, True, "Sum", device).to(device) # TODO: make these hyperparams configurable in command line 
     elif config.model == "GIN2":
-        model = GIN2(8, 3, input_size, 60, config.num_eigenvectors, 10, 0.1, True, "Sum", device).to(device) # TODO: make these hyperparams configurable in command line
+        model_config = config.GIN2_params
+        model = GIN2(model_config.num_layers, model_config.num_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, model_config.global_dim, model_config.dropout, True, "Sum", device).to(device) # TODO: make these hyperparams configurable in command line
     elif config.model == "MLP":
-        model = MLP(8, input_size, 60, config.num_eigenvectors).to(device)
+        model_config = config.MLP_params
+        model = MLP(model_config.num_layers, input_size, model_config.hidden_dim, config.num_eigenvectors).to(device)
     elif config.model == "harmonic":
         model = HarmonicAlgorithm(config.num_eigenvectors)
     else:

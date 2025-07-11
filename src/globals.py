@@ -6,6 +6,8 @@ use_cuda = torch.cuda.is_available()
 parser = ArgumentParser()
 # parser.add_argument("--cuda", type=bool, default=use_cuda)
 
+parser.add_argument('config', type=str, nargs = '?', default='config_default.yml') # CONFIG FILE, OVERRIDES EVERYTHING HERE 
+
 # MODEL ARCHITECTURE (some of these are not currently active)
 parser.add_argument("--model", type=str, choices=["GCN", 'GIN', 'GIN2', 'MLP', 'harmonic'], default='MLP')
 
@@ -99,4 +101,4 @@ parser.add_argument("--test", action="store_true")
 parser.add_argument("--dataset", type=str, choices=["ogbg_ppa", 'zinc'])
 
 
-config = parser.parse_args()
+args = parser.parse_args()

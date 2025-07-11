@@ -412,7 +412,7 @@ class GIN2(nn.Module):
 
 
 class RecurrentGIN(nn.Module):
-    def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim, output_dim, global_dim, final_dropout, learn_eps, neighbor_pooling_type, device):
+    def __init__(self, num_mlp_layers, input_dim, hidden_dim, output_dim, global_dim, final_dropout, learn_eps, neighbor_pooling_type, device):
         '''
             num_layers: number of layers in the neural networks (INCLUDING the input layer)
             num_mlp_layers: number of layers in mlps (EXCLUDING the input layer)
@@ -430,7 +430,7 @@ class RecurrentGIN(nn.Module):
 
         self.final_dropout = final_dropout
         self.device = device
-        self.num_layers = num_layers
+        self.num_layers = output_dim # one layer PER eigenecoordinate being predicted
         self.neighbor_pooling_type = neighbor_pooling_type
         self.learn_eps = learn_eps
         self.eps = nn.Parameter(torch.zeros(self.num_layers-1))
@@ -453,9 +453,9 @@ class RecurrentGIN(nn.Module):
         self.linears_prediction = torch.nn.ModuleList()
         for layer in range(num_layers):
             if layer == 0:
-                self.linears_prediction.append(nn.Linear(input_dim, output_dim))
+                self.linears_prediction.append(nn.Linear(input_dim, 1))
             else:
-                self.linears_prediction.append(nn.Linear(hidden_dim + global_dim, output_dim))
+                self.linears_prediction.append(nn.Linear(hidden_dim + global_dim, 1))
         
         self.global_mlp = MLP(num_mlp_layers, hidden_dim, hidden_dim, global_dim) # MLP to process graph-level signals
 
@@ -609,10 +609,10 @@ class RecurrentGIN(nn.Module):
 
             hidden_rep.append(final_h)
 
-        score_over_layer = 0
+        eigvec_preds = torch.zeros(x.shape[0], 0)
     
         #perform pooling over all nodes in each graph in every layer
         for layer, h in enumerate(hidden_rep):
             # pooled_h = torch.spmm(graph_pool, h)
-            score_over_layer += F.dropout(self.linears_prediction[layer](h), self.final_dropout, training = self.training)
-        return score_over_layer
+            eigvec_preds = torch.cat(self.linears_prediction[layer](h), eigvec_preds, dim=-1)
+        return eigvec_preds
