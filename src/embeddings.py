@@ -262,12 +262,13 @@ def neighbors_signal_emb(data: Data, num_scales=10, lazy_parameter=0.5):
     for i in range(N):
         for j in range(num_scales):
             signal = adj[i]
-            embs[i, j] = filters[j][i] @ signal # TODO: rewrite with torch functions
+
+            embs[i, j] = filters[j][i] @ signal.to_dense() # TODO: stack along the N dimension
     return embs
 
 
 
-def local_diffused_signal_emb(data: Data, num_scales=10, lazy_parameter=0.5):
+def diffused_dirac_emb(data: Data, num_scales=10, lazy_parameter=0.5):
     adj = data.edge_index
     N = adj.size(0)
 
@@ -287,6 +288,6 @@ def local_diffused_signal_emb(data: Data, num_scales=10, lazy_parameter=0.5):
 
             signal = diff_op @ signal
 
-            embs[i, j] = filters[j][i] @ signal
+            embs[i, j] = filters[j][i] @ signal.to_dense()
 
     return embs

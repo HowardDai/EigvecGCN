@@ -89,29 +89,46 @@ class DataEmbeddings:
 
         data.perms = []
         data.x = torch.ones(data.num_nodes, 0, dtype=torch.float32)
+
+        data.emb_runtimes = {}
+
         if self.config.diffusion_emb: # PERM INVARIANCE REQUIRED 
+            t1 = time.time()
             l = data.x.shape[-1]
             data.x = torch.cat((data.x, diffusion_emb(data)), dim=-1)
             r = data.x.shape[-1]
             data.perms.append([l, r])
+            data.emb_runtimes['diffusion_emb'] = time.time() - t1
 
         if self.config.wavelet_emb:
+            t1 = time.time()
             data.x = torch.cat((data.x, wavelet_emb(data)), dim=-1)
+            data.emb_runtimes['wavelet_emb'] = time.time() - t1
 
         if self.config.scatter_emb:
+            t1 = time.time()
             data.x = torch.cat((data.x, scatter_emb(data)), dim=-1)
+            data.emb_runtimes['scatter_emb'] = time.time() - t1
 
         if self.config.global_scatter_emb:
+            t1 = time.time()
             data.x = torch.cat((data.x, global_scatter_emb(data)), dim=-1)
+            data.emb_runtimes['global_scatter_emb'] = time.time() - t1
         
         if self.config.wavelet_moments_emb:
+            t1 = time.time()
             data.x = torch.cat((data.x, wavelet_moments_emb(data)), dim=-1)
+            data.emb_runtimes['wavelet_moments_emb'] = time.time() - t1
 
         if self.config.neighbor_bump_emb:
+            t1 = time.time()
             data.x = torch.cat((data.x, neighbors_signal_emb(data)), dim=-1)
+            data.emb_runtimes['neighbor_bump_emb'] = time.time() - t1
 
-        if self.config.neighbor_bump_emb:
-            data.x = torch.cat((data.x, local_diffused_signal_emb(data)), dim=-1)
+        if self.config.diffused_dirac_emb:
+            t1 = time.time()
+            data.x = torch.cat((data.x, diffused_dirac_emb(data)), dim=-1)
+            data.emb_runtimes['diffused_dirac_emb'] = time.time() - t1
         
 
         """# BUILDING EMBEDDINGS
@@ -230,12 +247,12 @@ class ForcedOrderTransform:
         # embeddings = DataEmbeddings(self.config)
         # data = embeddings(data)
         adj = data.edge_index
-        diff_op = get_diffusion(adj)
-        for i in range(3):
+        diff_op = 0.5 * get_diffusion(adj) + 0.5 * torch.eye(adj.shape[0]) # lazy random walk
+        for i in range(4):
             diff_op = diff_op @ diff_op
-
-        perm_indices = torch.argsort(diff_op, dim=0)
-        
+ 
+        perm_indices = torch.argsort(diff_op, dim=0).T # sort each node's embeddings by its column of diffusion operator
+        perm_indices = torch.cat((perm_indices, torch.arange(data.num_nodes, self.config.evec_len).repeat(data.num_nodes, 1)), dim=-1) # for the padded indices
         for interval in data.perms:
 
             n = interval[1]-interval[0]
@@ -244,13 +261,11 @@ class ForcedOrderTransform:
             for i in range(int(n / self.config.evec_len)):
                 l = interval[0] + i * self.config.evec_len
                 r = l + self.config.evec_len
-
-                shifted_perm_indices = perm_indices + l
-                print(interval)
-                print(shifted_perm_indices)
+                # shifted_perm_indices = perm_indices + l
+                # print(interval)
+                # print(shifted_perm_indices)
                 
-                data.x[:, l:r] = data.x[shifted_perm_indices] # TODO: Check if this syntax is right, want to order each column by their respective ordering specified in the column of shifted_perm_indices
-        
+                data.x[:, l:r] = torch.gather(data.x[:, l:r], 1, perm_indices) 
         return data
 
 
@@ -283,7 +298,7 @@ def load_data(config):
         transform = None
     elif config.invariance_transform == "random":
         transform = RandomTransform(config)
-    elif config.invariance_transform == "forcedorder":
+    elif config.invariance_transform == "forced_order":
         transform = ForcedOrderTransform(config)
 
     embeddings = DataEmbeddings(config)
@@ -409,12 +424,22 @@ def load_data(config):
         cache_list = []
         modified_list = []
         embeddings = DataEmbeddings(config)
+        runtimes_dict = {}
+        for idx, data in enumerate(tqdm(data_dict[key])):
+            
 
-        for data in tqdm(data_dict[key]):
             if config.use_mini_dataset < 1 and config.dataset != "zinc":
                 cache_list.append(data.clone())
             data = embeddings(data)
             modified_list.append(data)
+
+            if idx == 0:
+                runtimes_dict = data.emb_runtimes
+            else:
+                for emb_key in runtimes_dict:
+                    runtimes_dict[emb_key] += data.emb_runtimes[emb_key]
+
+        print(runtimes_dict)
 
         # 2) wrap them into a tiny InMemoryDataset
         # print("first element of cache_list:", cache_list[0])
@@ -423,6 +448,7 @@ def load_data(config):
 
         data_dict_emb[key] = CustomGraphDataset(modified_list, transform=transform)
 
+    
 
     if config.use_mini_dataset < 1 and config.dataset != "zinc":
  
