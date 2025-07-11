@@ -13,7 +13,7 @@ parser.add_argument("--hidden_dim", type=int, default=30)
 parser.add_argument("--dropout", type=float, default=0.5)
 parser.add_argument("--use_bias", type=bool, default=True)
 
-parser.add_argument("--num_eigenvectors", type=float, default=30)
+parser.add_argument("--num_eigenvectors", type=int, default=30)
 
 parser.add_argument("--evec_len", type=float, default=300)
 
@@ -96,7 +96,7 @@ parser.add_argument("--test", action="store_true")
 
 #DATA
 
-parser.add_argument("--dataset", type=str, choices=["ogbg_ppa", 'zinc'])
+parser.add_argument("--dataset", type=str, choices=["ogbg_ppa", 'zinc', 'drugbank'])
 
 
 config = parser.parse_args()

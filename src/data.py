@@ -25,6 +25,78 @@ import random
 from utils import *
 from embeddings import *
 
+import pandas as pd
+from rdkit import Chem
+import torch
+from torch_geometric.data import InMemoryDataset, Data
+import os
+
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+def smiles_to_data(smiles):
+    mol = Chem.MolFromSmiles(smiles)
+
+    edge_list = []
+    for bond in mol.GetBonds():
+        i = bond.GetBeginAtomIdx()
+        j = bond.GetEndAtomIdx()
+        edge_list.append((i, j))
+        edge_list.append((j, i))
+
+    edge_index = torch.tensor(edge_list, dtype=torch.long).t().contiguous()
+
+    data = Data(edge_index=edge_index)
+
+    return data
+
+
+class DrugBankDataset(InMemoryDataset):
+    def __init__(self, root, csv_path, transform=None, pre_transform=None):
+        self.csv_path = csv_path
+        super(DrugBankDataset, self).__init__(root, transform, pre_transform)
+        self.data, self.slices = torch.load(self.processed_paths[0])
+
+    @property
+    def raw_file_names(self):
+        print(os.path.basename("drugbank.csv"))
+        return [os.path.basename(self.csv_path)]
+
+    @property
+    def processed_file_names(self):
+        return ['data.pt']
+
+    def download(self):
+        pass
+
+    def process(self):
+        df = pd.read_csv(self.csv_path)
+        data_list = []
+
+        for _, row in df.iterrows():
+            smiles = row['SMILES']
+            data = smiles_to_data(smiles)
+            data_list.append(data)
+
+        data, slices = self.collate(data_list)
+        torch.save((data, slices), self.processed_paths[0])
+
+    def get_idx_split(dataset, train_ratio=0.8, valid_ratio=0.1, test_ratio=0.1, seed=42):
+
+        num_graphs = len(dataset)
+        indices = np.arange(num_graphs)
+
+        train_idx, temp_idx = train_test_split(indices, train_size=train_ratio, random_state=seed, shuffle=True)
+
+        valid_size = valid_ratio / (valid_ratio + test_ratio)
+        valid_idx, test_idx = train_test_split(temp_idx, train_size=valid_size, random_state=seed, shuffle=True)
+
+        return {
+            'train': train_idx,
+            'valid': valid_idx,
+            'test':  test_idx
+        }
+
 def get_padded_eigvecs(adj: torch.Tensor, max_graph_size: int):
     """
     Compute eigenvalues/eigenvectors of Laplacian(adj), then
@@ -278,6 +350,8 @@ def load_data(config):
     data_root = 'data'
     data_name = config.dataset
     data_path = os.path.join(data_root, data_name)
+
+    print(data_path)
     
     if config.invariance_transform == "none":
         transform = None
@@ -314,8 +388,11 @@ def load_data(config):
 
                 
 
-        elif config.dataset == 'ogbg_ppa':
-            dataset = PygGraphPropPredDataset(root=data_root, name='ogbg-ppa', transform=None, pre_transform=pre_transform)
+        elif config.dataset == 'ogbg_ppa' or config.dataset == 'drugbank':
+            if config.dataset == 'ogbg_ppa':
+                dataset = PygGraphPropPredDataset(root=data_root, name='ogbg-ppa', transform=None, pre_transform=pre_transform)
+            else:
+                dataset = DrugBankDataset(root=data_root, csv_path="/vast/palmer/pi/krishnaswamy_smita/nsn27/SUMRY/EigvecGCN/src/drugbank.csv", transform=None, pre_transform=pre_transform)
             print('data object loaded!')
 
             # sample = dataset[0]
