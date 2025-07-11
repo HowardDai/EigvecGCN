@@ -107,8 +107,10 @@ def SupervisedEigenvalueLoss(eigvecs_pred, adj, eigvals_gt, batch, config):
 
     eigval_inds = torch.arange(num_eigvals, dtype=torch.long, device=adj.device)
     for i in range(batch[-1] + 1):
-        inds = list(torch.argwhere(batch == i).squeeze())
-
+        inds = torch.argwhere(batch == i).squeeze()
+        print(inds)
+        print(L.shape)
+        print(batch.shape)
         lap = L[inds][:, inds]
         
         evecs_pred = eigvecs_pred[inds, :]

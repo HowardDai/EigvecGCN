@@ -28,7 +28,6 @@ if __name__ == "__main__":
         config = EasyDict(yaml.safe_load(f))
     
 
-
     if config.load_model != None:
         assert(os.path.exists(config.load_model))
     
