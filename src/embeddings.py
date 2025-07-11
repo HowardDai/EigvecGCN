@@ -258,7 +258,8 @@ def neighbors_signal_emb(data: Data, num_scales=10, lazy_parameter=0.5):
     signal = torch.ones(N)
 
     embs = torch.zeros(N, num_scales)
-
+    adj = adj.to_dense()
+    
     for i in range(N):
         for j in range(num_scales):
             signal = adj[i]
