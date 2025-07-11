@@ -258,8 +258,10 @@ def neighbors_signal_emb(data: Data, num_scales=10, lazy_parameter=0.5):
 
     embs = torch.zeros(N, num_scales)
 
-    for j in range(num_scales)
-        emb[:, j] = filters[j] @ adj
+    for i in range(N):
+        for j in range(num_scales):
+            signal = adj[i]
+            embs[i, j] = filters[j][i] @ signal
 
     return embs
 
