@@ -87,7 +87,34 @@ class DataEmbeddings:
 
     def __call__(self, data: Data) -> Data:
 
-        # BUILDING EMBEDDINGS
+        data.perms = []
+        data.x = torch.ones(data.num_nodes, 0, dtype=torch.float32)
+        if self.config.diffusion_emb: # PERM INVARIANCE REQUIRED 
+            l = data.x.shape[-1]
+            data.x = torch.cat((data.x, data.diffusion_emb), dim=-1)
+            r = data.x.shape[-1]
+            data.perms.append([l, r])
+
+        if self.config.wavelet_emb:
+            data.x = torch.cat((data.x, wavelet_emb(data)), dim=-1)
+
+        if self.config.scatter_emb:
+            data.x = torch.cat((data.x, scatter_emb(data)), dim=-1)
+
+        if self.config.global_scatter_emb:
+            data.x = torch.cat((data.x, global_scatter_emb(data)), dim=-1)
+        
+        if self.config.wavelet_moments_emb:
+            data.x = torch.cat((data.x, wavelet_moments_emb(data)), dim=-1)
+
+        if self.config.neighbor_bump_emb:
+            data.x = torch.cat((data.x, neighbors_signal_emb(data)), dim=-1)
+
+        if self.config.neighbor_bump_emb:
+            data.x = torch.cat((data.x, local_diffused_signal_emb(data)), dim=-1)
+        
+
+        """# BUILDING EMBEDDINGS
         t1 = time.time()
         if self.config.diffusion_emb: # PERM INVARIANCE REQUIRED 
             data.diffusion_emb = diffusion_emb(data)
@@ -112,6 +139,23 @@ class DataEmbeddings:
             data.global_scatter_emb = global_scatter_emb(data)
         t2=time.time()
         # print("Global scatter runtime:", t2-t1)
+
+        t1=time.time()
+        if self.config.wavelet_moments_emb:
+            data.wavelet_moments = wavelet_moments_emb(data)
+        t2=time.time()
+
+        t1=time.time()
+        if self.config.neighbor_bump_emb:
+            data.neighbor_bump = neighbors_signal_emb(data)
+        t2=time.time()
+
+        t1=time.time()
+        if self.config.diffused_dirac_emb:
+            data.diffused_dirac = local_diffused_signal_emb(data)
+        t2=time.time()
+
+        
     
 
         # CONCATENATING THE EMBEDDINGS 
@@ -139,7 +183,7 @@ class DataEmbeddings:
         if data.x.shape[-1] == 0: # trivial embeddings, if no other embeddings
             data.x = torch.ones(data.num_nodes, 1, dtype=torch.float32)
 
-        t2 = time.time()
+        t2 = time.time()"""
         # print("Concatenation step:", t2-t1)
 
         #modifying the eigval and eigvec matrices to match the # of eigvecs we actually care about

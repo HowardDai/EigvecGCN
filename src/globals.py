@@ -61,14 +61,16 @@ parser.add_argument("--scatter_emb",action="store_true")
 parser.add_argument("--global_scatter_emb",action="store_true")
 # for each node, dirac, scatter wavelets, and then global moment aggregation
 
-parser.add_argument("--wavelet_moments_emb",action="store_true")
- 
-parser.add_argument("--neighbor_bump_emb",action="store_true")
-
-parser.add_argument("--diffused_dirac_emb",action="store_true")
-
 parser.add_argument("--invariance_transform", type=str, choices=["none", "random", "forcedorder"], default="none")
 
+parser.add_argument("--wavelet_moments_emb",action="store_true")
+# compute moments of wavelet transforms, dot each row with uniform signal
+ 
+parser.add_argument("--neighbor_bump_emb",action="store_true")
+# apply wavelets to row of adjacency for each node
+
+parser.add_argument("--diffused_dirac_emb",action="store_true")
+# apply wavelets to diffused dirac signal at each node
 
 # DATASET LOADING
 parser.add_argument("--use_mini_dataset", type=float, default=1)

@@ -135,6 +135,7 @@ def global_scatter_emb(data, num_scales=5):
     out = torch.zeros(data.num_nodes, 0, dtype=torch.float32)
     for i in range(len(wavelet_paths)):
         out = torch.cat((out, global_scattering_transform(data,wavelet_inds = wavelet_paths[i])), dim=-1)
+    return out
 
 
 def scattering_transform(data: Data, num_scales=5, lazy_parameter=0.5, wavelet_inds=[]):
@@ -231,8 +232,7 @@ def wavelet_emb(data: Data, num_scales=10, lazy_parameter=0.5):
         
     return embs
 
-
-def wavelet_moments(data: Data, num_moments=4, num_scales=10, lazy_parameter=0.5):
+def wavelet_moments_emb(data: Data, num_moments=4, num_scales=10, lazy_parameter=0.5):
     adj = data.edge_index
     N = adj.size(0)
 
@@ -249,7 +249,7 @@ def wavelet_moments(data: Data, num_moments=4, num_scales=10, lazy_parameter=0.5
     return embs
 
 
-def neighbors_signal(data: Data, num_scales=10, lazy_parameter=0.5):
+def neighbors_signal_emb(data: Data, num_scales=10, lazy_parameter=0.5):
     adj = data.edge_index
     N = adj.size(0)
 
@@ -265,7 +265,7 @@ def neighbors_signal(data: Data, num_scales=10, lazy_parameter=0.5):
 
     return embs
 
-def local_diffused_signal(data: Data, num_scales=10, lazy_parameter=0.5):
+def local_diffused_signal_emb(data: Data, num_scales=10, lazy_parameter=0.5):
     adj = data.edge_index
     N = adj.size(0)
 
