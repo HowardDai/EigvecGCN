@@ -231,6 +231,7 @@ def wavelet_emb(data: Data, num_scales=10, lazy_parameter=0.5):
         
     return embs
 
+
 def wavelet_moments(data: Data, num_moments=4, num_scales=10, lazy_parameter=0.5):
     adj = data.edge_index
     N = adj.size(0)
@@ -244,7 +245,7 @@ def wavelet_moments(data: Data, num_moments=4, num_scales=10, lazy_parameter=0.5
         i = 0
         for moment in range(num_moments):
             embs[:, i] = (filter**moment) @ signal
-             i += 1
+            i += 1
     return embs
 
 

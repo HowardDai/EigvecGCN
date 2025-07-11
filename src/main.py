@@ -3,6 +3,7 @@ sys.path.append("models/")
 from mlp import MLP
 from GCN import GCN
 from GIN import GIN
+from GIN import GIN2
 from harmonic import HarmonicAlgorithm
 
 from utils import *
@@ -39,6 +40,8 @@ if __name__ == "__main__":
         model = GCN(input_size, config.num_eigenvectors, config.dropout, config.use_bias).to(device)
     elif config.model == "GIN":
         model = GIN(8, 3, input_size, 60, config.num_eigenvectors, 0.1, True, "Sum", device).to(device) # TODO: make these hyperparams configurable in command line 
+    elif config.model == "GIN2":
+        model = GIN2(8, 3, input_size, 60, config.num_eigenvectors, 10, 0.1, True, "Sum", device).to(device) # TODO: make these hyperparams configurable in command line
     elif config.model == "MLP":
         model = MLP(8, input_size, 60, config.num_eigenvectors).to(device)
     elif config.model == "harmonic":

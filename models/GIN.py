@@ -6,6 +6,9 @@ import sys
 sys.path.append("models/")
 from mlp import MLP
 
+from torch_geometric.nn import global_add_pool
+
+
 class GIN(nn.Module):
     def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim, output_dim, final_dropout, learn_eps, neighbor_pooling_type, device):
         '''
@@ -203,19 +206,20 @@ class GIN(nn.Module):
 
 
 class GIN2(nn.Module):
-    def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim, output_dim, final_dropout, learn_eps, neighbor_pooling_type, device):
+    def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim, output_dim, global_dim, final_dropout, learn_eps, neighbor_pooling_type, device):
         '''
             num_layers: number of layers in the neural networks (INCLUDING the input layer)
             num_mlp_layers: number of layers in mlps (EXCLUDING the input layer)
             input_dim: dimensionality of input features
             hidden_dim: dimensionality of hidden units at ALL layers
             output_dim: number of classes for prediction
+            global_dim: dimension of the "global" part of inputs to MLP, which are processed by a separate MLP
             final_dropout: dropout ratio on the final linear layer
             learn_eps: If True, learn epsilon to distinguish center nodes from neighboring nodes. If False, aggregate neighbors and center nodes altogether. 
             neighbor_pooling_type: how to aggregate neighbors (mean, average, or max)
             device: which device to use
         '''
-        
+
         super(GIN, self).__init__()
 
         self.final_dropout = final_dropout
@@ -235,17 +239,19 @@ class GIN2(nn.Module):
             if layer == 0:
                 self.mlps.append(MLP(num_mlp_layers, input_dim, hidden_dim, hidden_dim))
             else:
-                self.mlps.append(MLP(num_mlp_layers, hidden_dim, hidden_dim, hidden_dim))
+                self.mlps.append(MLP(num_mlp_layers, hidden_dim + global_dim, hidden_dim, hidden_dim))
 
             self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
 
-        #Linear function that maps the hidden representation at dofferemt layers into a prediction score
+        #Linear function that maps the hidden representation at different layers into a prediction score
         self.linears_prediction = torch.nn.ModuleList()
         for layer in range(num_layers):
             if layer == 0:
                 self.linears_prediction.append(nn.Linear(input_dim, output_dim))
             else:
-                self.linears_prediction.append(nn.Linear(hidden_dim, output_dim))
+                self.linears_prediction.append(nn.Linear(hidden_dim + global_dim, output_dim))
+        
+        self.global_mlp = MLP(num_mlp_layers, hidden_dim, hidden_dim, global_dim) # MLP to process graph-level signals
 
 
     def __preprocess_neighbors_maxpool(self, batch_graph):
@@ -374,6 +380,7 @@ class GIN2(nn.Module):
         h = X_concat
 
         for layer in range(self.num_layers-1):
+
             if self.neighbor_pooling_type == "max" and self.learn_eps:
                 h = self.next_layer_eps(h, layer, padded_neighbor_list = padded_neighbor_list)
             elif not self.neighbor_pooling_type == "max" and self.learn_eps:
@@ -382,8 +389,19 @@ class GIN2(nn.Module):
                 h = self.next_layer(h, layer, padded_neighbor_list = padded_neighbor_list)
             elif not self.neighbor_pooling_type == "max" and not self.learn_eps:
                 h = self.next_layer(h, layer, Adj_block = Adj_block)
+            
+            # ADDING GLOBAL EMBEDDINGS TO EACH NODE 
 
-            hidden_rep.append(h)
+            if layer == self.num_layers-1: # last layer, do not compute the global embeddings 
+                final_h = h
+            else:
+                pooled_h = global_add_pool(h, batch) # using SUM pooling for now, # B x hidden_dim
+                global_h = self.global_mlp(pooled_h) # B x global_dim
+                global_h_per_node = global_h[batch] # N x global_dim
+                final_h = torch.cat((global_h, h), dim=-1) # TODO double check everything here 
+
+
+            hidden_rep.append(final_h)
 
         score_over_layer = 0
     
