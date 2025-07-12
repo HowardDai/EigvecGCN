@@ -202,6 +202,23 @@ class DataEmbeddings:
             data.x = torch.cat((data.x, diffused_dirac_emb(data)), dim=-1)
             data.emb_runtimes['diffused_dirac_emb'] = time.time() - t1
         
+        
+        t1 = time.time()
+        # data.x = torch.cat((data.x, diffused_dirac_emb(data)), dim=-1)
+        L, Q = torch.linalg.eigh(get_lap(data.edge_index)) # TEMPORARY, JUST FOR RUNTIME TESTING
+        data.emb_runtimes['eigh'] = time.time() - t1
+
+        # t1 = time.time()
+        # # data.x = torch.cat((data.x, diffused_dirac_emb(data)), dim=-1)
+        # L, Q = torch.linalg.eig(get_lap(data.edge_index)) # TEMPORARY, JUST FOR RUNTIME TESTING
+        # data.emb_runtimes['eig'] = time.time() - t1
+
+        # t1 = time.time()
+        # if data.num_nodes >= 3 * self.config.num_eigenvectors:
+        #     lobpcg = torch.lobpcg(get_lap(data.edge_index), k=self.config.num_eigenvectors, method="ortho")
+        # else: 
+        #     print("not enough nodes to compute lobpcg")
+        # data.emb_runtimes['lobpcg'] = time.time() - t1
 
         """# BUILDING EMBEDDINGS
         t1 = time.time()

@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 import igraph as ig
 import matplotlib.pyplot as plt

@@ -1,3 +1,4 @@
+# DEFAULT CONFIG FILE: PLEASE MAKE A COPY TO RUN CUSTOM SCRIPTS 
 
 # config.yml
 
@@ -5,7 +6,7 @@
 cuda: true  # override if you wish to disable CUDA
 
 # MODEL ARCHITECTURE
-model: "GIN"               # choices: "GIN", "GIN2", "RecurrentGIN", "MLP", "harmonic"
+model: "GIN"               # choices: "GIN", "GIN2", "RecurrentGIN", "GlobalGIN", "MLP", "harmonic"
 GIN_params:
   num_layers: 8
   num_mlp_layers: 3
@@ -22,10 +23,17 @@ RecurrentGIN_params:
   hidden_dim: 30
   global_dim: 5
   dropout: 0.1 
+GlobalGIN_params: 
+  num_layers: 8
+  num_mlp_layers: 3
+  hidden_dim: 60
+  dropout: 0.1 
 MLP_params:
   num_layers: 8
   hidden_dim: 60
   dropout: 0.1 
+
+
 
 use_bias: true
 
@@ -65,7 +73,8 @@ use_mini_dataset: 1.0
 use_supervised: false
 
 # MODEL LOAD / SAVE PATHS
-checkpoint_folder: ""
+checkpoint_folder: None # Only change this if you want a custom folder name, otherwise defaults to match the name of this config file
+ 
 load_model: null                # path to a saved model, or null
 
 # ACTIONS

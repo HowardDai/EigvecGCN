@@ -4,7 +4,8 @@ from mlp import MLP
 from GCN import GCN
 from GIN import GIN
 from GIN import GIN2
-from GIN import RecurrentGIN
+from GIN import RecurrentGIN 
+from GlobalGIN import GlobalGIN 
 
 from harmonic import HarmonicAlgorithm
 
@@ -21,7 +22,6 @@ import yaml
 
 
 
-
 if __name__ == "__main__":
     config = {}
     with open(args.config, 'r') as f:
@@ -31,6 +31,8 @@ if __name__ == "__main__":
     if config.load_model != None:
         assert(os.path.exists(config.load_model))
     
+    if config.checkpoint_folder == None:
+        config.checkpoint_folder = os.path.basename(args.config)[:-4] # copies filename of yml file, without the .yml extension
     # LOADING DATASET
     
     data_dict_emb, train_loader, val_loader, test_loader = load_data(config)
@@ -61,6 +63,9 @@ if __name__ == "__main__":
     elif config.model == "MLP":
         model_config = config.MLP_params
         model = MLP(model_config.num_layers, input_size, model_config.hidden_dim, config.num_eigenvectors).to(device)
+    elif config.model == "GlobalGIN":
+        model_config = config.GlobalGIN_params
+        model = GlobalGIN(model_config.num_layers, model_config.num_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, config.evec_len, model_config.dropout, True, "Sum", device).to(device) 
     elif config.model == "harmonic":
         model = HarmonicAlgorithm(config.num_eigenvectors)
     else:
