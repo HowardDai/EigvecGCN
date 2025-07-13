@@ -6,14 +6,16 @@ use_cuda = torch.cuda.is_available()
 parser = ArgumentParser()
 # parser.add_argument("--cuda", type=bool, default=use_cuda)
 
+parser.add_argument('--config', type=str, nargs = '?', default='config_default.yml') # CONFIG FILE, OVERRIDES EVERYTHING BELOW 
+
 # MODEL ARCHITECTURE (some of these are not currently active)
-parser.add_argument("--model", type=str, choices=["GCN", 'GIN', 'MLP', 'harmonic', 'MLP2'], default='MLP')
+parser.add_argument("--model", type=str, choices=["GCN", 'GIN', 'GIN2', 'MLP', 'MLP2', 'harmonic'], default='MLP')
 
 parser.add_argument("--hidden_dim", type=int, default=30)
 parser.add_argument("--dropout", type=float, default=0.5)
 parser.add_argument("--use_bias", type=bool, default=True)
 
-parser.add_argument("--num_eigenvectors", type=float, default=30)
+parser.add_argument("--num_eigenvectors", type=int, default=30)
 
 parser.add_argument("--evec_len", type=float, default=300)
 
@@ -59,8 +61,18 @@ parser.add_argument("--scatter_emb",action="store_true")
 # Choose two nodes, dirac at each, scatter wavelets
 
 parser.add_argument("--global_scatter_emb",action="store_true")
-# for each node, dirac, scatter wavelets, and then global moment aggregation 
+# for each node, dirac, scatter wavelets, and then global moment aggregation
 
+parser.add_argument("--invariance_transform", type=str, choices=["none", "random", "forced_order"], default="none")
+
+parser.add_argument("--wavelet_moments_emb",action="store_true")
+# compute moments of wavelet transforms, dot each row with uniform signal
+ 
+parser.add_argument("--neighbor_bump_emb",action="store_true")
+# apply wavelets to row of adjacency for each node
+
+parser.add_argument("--diffused_dirac_emb",action="store_true")
+# apply wavelets to diffused dirac signal at each node
 
 # DATASET LOADING
 parser.add_argument("--use_mini_dataset", type=float, default=1)
@@ -86,7 +98,7 @@ parser.add_argument("--test", action="store_true")
 
 #DATA
 
-parser.add_argument("--dataset", type=str, choices=["ogbg_ppa", 'zinc'])
+parser.add_argument("--dataset", type=str, choices=["ogbg_ppa", 'zinc', 'drugbank'])
 
 
-config = parser.parse_args()
+args = parser.parse_args()

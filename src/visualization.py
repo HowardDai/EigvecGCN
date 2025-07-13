@@ -1,10 +1,11 @@
+import torch
 import numpy as np
 import igraph as ig
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 
 import phate
-
+from utils import *
 
 
 def plot_phate(evecs_pred, evecs_gt, adj, num_eigenvectors=15):
@@ -48,7 +49,7 @@ def plot_results(config, model, device, val_loader, validation_loss_hist=None, t
         ax = fig.add_subplot(1, 1, 1)
         ax.plot(range(1, config.epochs + 1), validation_loss_hist, color='tab:blue', label='validation')
         ax.plot(range(1, config.epochs + 1), train_loss_hist, color='tab:orange', label='training')
-        ax.set(xlabel='Epoch', ylabel='Loss', title=f"{config.loss_function} Loss History")
+        ax.set(xlabel='Epoch', ylabel='Loss', title=f"Loss History")
         ax.legend()
         fig.savefig(f"plots/{config.checkpoint_folder}/loss_plots.png")
 
