@@ -112,6 +112,9 @@ def find_diameter_endpoints(adj: torch.sparse_coo_tensor):
     return u1, u2
 
 def degree_node_selection(adj: torch.sparse_coo_tensor, k, largest=True):
+    """
+    Returns the indicies of the k highest degree nodes
+    """
     degrees = torch.sum(adj.to_dense(), dim = 0)
     _, indices = degrees.topk(k, largest=largest)
     return indices

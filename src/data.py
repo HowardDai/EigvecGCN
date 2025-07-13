@@ -34,6 +34,10 @@ import os
 from sklearn.model_selection import train_test_split
 import numpy as np
 
+from global_embeddings import GlobalEmbeddings
+
+from torch.utils.data import DataLoader as torchDL
+
 def smiles_to_data(smiles):
     mol = Chem.MolFromSmiles(smiles)
 
@@ -438,7 +442,7 @@ def load_data(config):
                     temp_val_idx   = torch.tensor(sample_idx(split_idx['valid'].tolist()))
                     temp_test_idx  = torch.tensor(sample_idx(split_idx['test'].tolist()))
                     idx_dict = {'train': temp_train_idx, 'valid': temp_val_idx, 'test':temp_test_idx}
-                    torch.save(idx_dict, os.path.join(data_path, f"mini_dataset_indices_{subset_frac}")) # Note: these indices are saved relative to the FULL dataset 
+                    #torch.save(idx_dict, os.path.join(data_path, f"mini_dataset_indices_{subset_frac}")) # Note: these indices are saved relative to the FULL dataset 
             
 
                 all_indices = torch.cat((temp_train_idx, temp_val_idx, temp_test_idx))
@@ -547,8 +551,24 @@ def load_data(config):
     else:
         test_loader = None
 
-    
-    
 
 
     return data_dict_emb, train_loader, val_loader, test_loader
+
+def load_data_global(config):
+    data_root ='data'
+    pre_transform = DataPreTransform(config)
+    
+    train_dataset = ZINC(root=data_root, transform=None, pre_transform=pre_transform, subset=True)
+    val_dataset = ZINC(root=data_root, transform=None, pre_transform=pre_transform, subset=True, split="val")
+    test_dataset = ZINC(root=data_root, transform=None, pre_transform=pre_transform, subset=True, split="test")
+
+    embed = GlobalEmbeddings(train_dataset, val_dataset, test_dataset)
+
+    new_train, new_val, new_test = embed()
+
+    train_loader = torchDL(new_train, batch_size=32, shuffle=True)
+    val_loader = torchDL(new_val, batch_size=32, shuffle=True)
+    test_loader = torchDL(new_test, batch_size=32, shuffle=True)
+
+    return train_loader, val_loader, test_loader

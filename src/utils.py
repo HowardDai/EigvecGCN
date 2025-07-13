@@ -1,6 +1,4 @@
 import torch
-
-
 import numpy as np
 import scipy.sparse as sparse
 from torch_geometric.utils import to_dense_adj
@@ -16,7 +14,7 @@ def all_index_combinations(k: int) -> List[List[int]]:
     the integer value of their binary inclusion mask.
     """
     result = []
-    for mask in range(1 << k):            # 0 .. 2^k - 1
+    for mask in range(1, 1 << k):            # 0 .. 2^k - 1
         subset = [i for i in range(k) 
                   if (mask >> i) & 1]     # include i if bit i is 1
         result.append(subset)
