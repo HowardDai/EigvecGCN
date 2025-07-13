@@ -34,6 +34,11 @@ import os
 from sklearn.model_selection import train_test_split
 import numpy as np
 
+import time
+import scipy.sparse as sp
+
+from torch_geometric.transforms import LargestConnectedComponents
+
 def smiles_to_data(smiles):
     mol = Chem.MolFromSmiles(smiles)
 
@@ -144,20 +149,37 @@ class DataPreTransform:
         self.config = config
     
     def __call__(self, data: Data) -> Data:
+
+        total_nodes_before = data.num_nodes
+
+        if self.config.use_largest_connected_components: # taken from "LargestConnectedComponents" in pytorch geometric
+            data = LargestConnectedComponents(1)(data)
+            
+            if data.num_nodes != total_nodes_before:
+                print(f"Taking largest connected component: {data.num_nodes} out of {total_nodes_before}")
+            else:
+                print(f"Graph already connected: {data.num_nodes}")
+
+
         data.edge_index = edge_index_to_sparse_adj(data.edge_index, data.num_nodes)
-        evals, evecs = get_padded_eigvecs(data.edge_index, self.config.evec_len)
-        data.eigvecs = evecs 
-        data.eigvals = evals
- 
+
+        if self.config.use_supervised:
+            evals, evecs = get_padded_eigvecs(data.edge_index, self.config.evec_len)
+            data.eigvecs = evecs 
+            data.eigvals = evals
+
         return data
 
-import time
+
 
 class DataEmbeddings:
     def __init__(self, config):
         self.config = config
 
     def __call__(self, data: Data) -> Data:
+
+
+
 
         data.perms = []
         data.x = torch.ones(data.num_nodes, 0, dtype=torch.float32)
@@ -473,7 +495,24 @@ def load_data(config):
                 print(split_idx['train'].shape)
                 print(split_idx['valid'].shape)
 
-        
+                print("ALL INDICES LENGTH:", all_indices.shape)
+                subdataset = dataset[all_indices] # subdataset = dataset[all_indices] 
+                data_dict = {'train': subdataset[train_idx], 'valid': subdataset[val_idx], 'test': subdataset[test_idx]}
+
+                print("Saving mini dataset to cache...")
+                data_dict_cache = {}
+                for key in data_dict:
+                    cache_list = []
+                    for data in tqdm(data_dict[key]):
+                        
+                        cache_list.append(data.clone())
+                
+                    data_dict_cache[key] = CustomGraphDataset(cache_list)
+
+                torch.save(data_dict_cache, os.path.join(data_path, f"mini_dataset_{subset_frac}.pt"))
+                print(f"Mini dataset saved: {os.path.join(data_path, f"mini_dataset_{subset_frac}.pt")}")
+
+
             else:
                 print("Using full dataset")
                 train_idx = split_idx['train'] 
@@ -482,14 +521,17 @@ def load_data(config):
                 N = len(dataset)
                 all_indices = torch.arange(start=0, end=N) # basically just all the indices
 
-            print("ALL INDICES LENGTH:", all_indices.shape)
-            subdataset = dataset[all_indices] # subdataset = dataset[all_indices] 
-            data_dict = {'train': subdataset[train_idx], 'valid': subdataset[val_idx], 'test': subdataset[test_idx]}
+                print("ALL INDICES LENGTH:", all_indices.shape)
+                subdataset = dataset[all_indices] # subdataset = dataset[all_indices] 
+                data_dict = {'train': subdataset[train_idx], 'valid': subdataset[val_idx], 'test': subdataset[test_idx]}
+
+
+            
 
 
       
 
-
+    
 
 
 
@@ -497,7 +539,7 @@ def load_data(config):
     print("Processing embeddings...")
 
     need_emb = {'train': False, 'valid': False, 'test': False}
-    data_dict_cache = {}
+    
     data_dict_emb = {} 
 
 
@@ -513,17 +555,17 @@ def load_data(config):
         if not need_emb[key]:
             print(f"No embeddings needed for {key}")
             continue
-
+        
         print(f"Processing embeddings for {key}")
-        cache_list = []
+    
         modified_list = []
         embeddings = DataEmbeddings(config)
         runtimes_dict = {}
         for idx, data in enumerate(tqdm(data_dict[key])):
             
 
-            if config.use_mini_dataset < 1 and config.dataset != "zinc":
-                cache_list.append(data.clone())
+            
+            
             data = embeddings(data)
             modified_list.append(data)
 
@@ -537,17 +579,13 @@ def load_data(config):
 
         # 2) wrap them into a tiny InMemoryDataset
         # print("first element of cache_list:", cache_list[0])
-        if config.use_mini_dataset < 1 and config.dataset != "zinc" :
-            data_dict_cache[key] = CustomGraphDataset(cache_list)
 
         data_dict_emb[key] = CustomGraphDataset(modified_list, transform=transform)
 
     
 
-    if config.use_mini_dataset < 1 and config.dataset != "zinc":
  
-        torch.save(data_dict_cache, os.path.join(data_path, f"mini_dataset_{subset_frac}.pt"))
-        print("Mini dataset saved")
+        
     
     print("Embeddings processed!")
 

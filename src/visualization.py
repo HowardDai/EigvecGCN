@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 
 import phate
-
+from utils import *
 
 
 def plot_phate(evecs_pred, evecs_gt, adj, num_eigenvectors=15):

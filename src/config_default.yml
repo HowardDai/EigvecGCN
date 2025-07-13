@@ -68,12 +68,15 @@ wavelet_moments_emb: false
 neighbor_bump_emb: false
 diffused_dirac_emb: false
 
-# DATASET LOADING
-use_mini_dataset: 1.0
+# DATASET LOADING: preprocessing (delete "processed" folder to recompute from scratch if you are changing settings)
 use_supervised: false
+use_largest_connected_components: true
+
+# DATASET LOADING: per-run
+use_mini_dataset: 1.0
 
 # MODEL LOAD / SAVE PATHS
-checkpoint_folder: None # Only change this if you want a custom folder name, otherwise defaults to match the name of this config file
+checkpoint_folder: # Only change this if you want a custom folder name, otherwise defaults to match the name of this config file
  
 load_model: null                # path to a saved model, or null
 

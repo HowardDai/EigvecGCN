@@ -351,7 +351,7 @@ def evaluate(model, loader, device, config):
     for data in tqdm(loader):
         data = data.to(device)
         t1 = time.time()
-        out = model(data.x, data.edge_index, data.batch)
+        out = model(data.x, data.edge_index, data.batch).to(device) 
 
         
 
