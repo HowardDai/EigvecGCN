@@ -7,7 +7,7 @@ parser = ArgumentParser()
 # parser.add_argument("--cuda", type=bool, default=use_cuda)
 
 # MODEL ARCHITECTURE (some of these are not currently active)
-parser.add_argument("--model", type=str, choices=["GCN", 'GIN', 'MLP', 'harmonic'], default='MLP')
+parser.add_argument("--model", type=str, choices=["GCN", 'GIN', 'MLP', 'harmonic', 'MLP2'], default='MLP')
 
 parser.add_argument("--hidden_dim", type=int, default=30)
 parser.add_argument("--dropout", type=float, default=0.5)
@@ -35,7 +35,7 @@ parser.add_argument("--energy", action="store_true")
 parser.add_argument("--supervised_eigval", action="store_true")
 parser.add_argument("--supervised_eigval_unweighted", action="store_true")
 parser.add_argument("--supervised_lap_reconstruction", action="store_true")
-parser.add_argument("--supervied_mse", action="store_true")
+parser.add_argument("--supervised_mse", action="store_true")
 
 
 # parser.add_argument("--embedding_type", type=str, choices=['diffusion', 'wavelet', 'trivial', 'scatter'], default='trivial')

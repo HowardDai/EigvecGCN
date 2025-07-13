@@ -1,6 +1,7 @@
 import sys
 sys.path.append("models/")
 from mlp import MLP
+from mlp2 import MLP2
 from GCN import GCN
 from GIN import GIN
 from harmonic import HarmonicAlgorithm
@@ -40,6 +41,8 @@ if __name__ == "__main__":
         model = GIN(8, 3, input_size, 60, config.num_eigenvectors, 0.1, True, "Sum", device).to(device) # TODO: make these hyperparams configurable in command line 
     elif config.model == "MLP":
         model = MLP(8, input_size, 60, config.num_eigenvectors).to(device)
+    elif config.model == "MLP2":
+        model = MLP2(8, input_size, 60, config.num_eigenvectors, config.dropout).to(device)
     elif config.model == "harmonic":
         model = HarmonicAlgorithm(config.num_eigenvectors)
     else:

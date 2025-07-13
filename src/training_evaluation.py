@@ -147,12 +147,12 @@ def SupervisedEigenvalueLossUnweighted(eigvecs_pred, adj, eigvals_gt, batch, con
 
 def projection_loss(config, eigvecs_pred, eigvecs_gt, batch):
     loss = 0
-    evec_inds = torch.arange(config.evec_len, dtype=torch.long, device=batch.device)
+    evec_inds = 0
 
     for i in range(batch[-1] + 1):
         inds = list(torch.argwhere(batch == i).squeeze())
-        U_hat = eigves_pred[inds, :]
-        U = eigvecs_gt[evec_inds]
+        U_hat = eigvecs_pred[inds, :]
+        U = eigvecs_gt[evec_inds: evec_inds + len(inds)]
         loss += torch.norm(U.T @ U_hat @ U.T - U_hat.T)
         evec_inds += config.evec_len
     
@@ -165,7 +165,7 @@ def cosine_loss(config, eigvecs_pred, eigvecs_gt, batch):
 
     for i in range(batch[-1] + 1):
         inds = list(torch.argwhere(batch == i).squeeze())
-        U_hat = eigves_pred[inds, :]
+        U_hat = eigvecs_pred[inds, :]
         U = eigvecs_gt[evec_inds]
         cos_theta = torch.diag(U.T @ U_hat @ U.T @ U_hat.T)
 
@@ -393,12 +393,9 @@ def evaluate(model, loader, device, config):
                 loss = lap_reconstruction_loss(out, data.eigvals, data.eigvecs[:, :config.num_eigenvectors], data.edge_index, data.batch, config)
             if loss_function == 'ortho':
                 loss = OrthogonalityLoss(out)
-            if loss_function == 'cosine':
-                loss = cosine_loss(config, out, data.eigvecs, data.batch)
-            loss_dict[loss_function] += loss.item()
             if loss_function =='projection':
                 loss = projection_loss(config, out, data.eigvecs, data.batch)
-
+            loss_dict[loss_function] += loss.item()
         total_eigval_sum += torch.sum(data.eigvals)
         total_num_eigvecs += num_eigvecs * (data.batch[-1]+1)
 
