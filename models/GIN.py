@@ -615,3 +615,5 @@ class RecurrentGIN(nn.Module):
             # pooled_h = torch.spmm(graph_pool, h)
             eigvec_preds = torch.cat((self.linears_prediction[layer](h), eigvec_preds), dim=-1)
         return eigvec_preds
+
+
