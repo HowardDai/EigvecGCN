@@ -618,7 +618,7 @@ def load_data_global(config):
     val_dataset = ZINC(root=data_root, transform=None, pre_transform=pre_transform, subset=True, split="val")
     test_dataset = ZINC(root=data_root, transform=None, pre_transform=pre_transform, subset=True, split="test")
 
-    embed = GlobalEmbeddings(train_dataset, val_dataset, test_dataset)
+    embed = GlobalEmbeddings(train_dataset, val_dataset, test_dataset, config)
 
     new_train, new_val, new_test = embed()
 
