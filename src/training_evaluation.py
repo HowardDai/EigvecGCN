@@ -329,6 +329,15 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
     return validation_loss_hist
 
 
+import signal
+
+class TimeoutException(Exception):
+    pass
+
+def _timeout_handler(signum, frame):
+    raise TimeoutException()
+
+signal.signal(signal.SIGALRM, _timeout_handler)
 
 
 
@@ -348,7 +357,11 @@ def evaluate(model, loader, device, config):
     num_eigvecs = config.num_eigenvectors
 
 
-    for data in tqdm(loader):
+    for idx, data in enumerate(tqdm(loader)):
+        
+        print(data.num_nodes)
+
+        
         data = data.to(device)
         t1 = time.time()
         out = model(data.x, data.edge_index, data.batch).to(device) 
@@ -384,20 +397,25 @@ def evaluate(model, loader, device, config):
 
         total_eigval_sum += torch.sum(data.eigvals)
         total_num_eigvecs += num_eigvecs * (data.batch[-1]+1)
+    
+
+    num_items = len(loader.dataset) 
 
     print("k: ", num_eigvecs)
     print("average eigval: ", (total_eigval_sum / total_num_eigvecs).item() )
-    print("Size of test set: ", (len(loader.dataset)))
+    print("Size of test set: ", (num_items))
     for loss_function in loss_dict:
-        loss_dict[loss_function] =  loss_dict[loss_function] / len(loader.dataset)
+        loss_dict[loss_function] =  loss_dict[loss_function] / num_items
         print(loss_function, ": ", loss_dict[loss_function])
     
     
-    avg_runtime = total_runtime / len(loader.dataset)
+    avg_runtime = total_runtime / num_items
     print(avg_runtime)
     out_dict = loss_dict
     out_dict['runtime'] = avg_runtime
     out_dict['dataset'] = config.dataset
+
+    plot_results(config, model, device, loader)
 
     return out_dict
     

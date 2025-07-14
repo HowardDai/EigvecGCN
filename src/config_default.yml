@@ -86,6 +86,5 @@ test: false
 
 # DATA
 dataset: "ogbg_ppa"            # choices: "ogbg_ppa", "zinc"
-evec_len: 300
 num_eigenvectors: 30
 

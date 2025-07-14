@@ -33,12 +33,24 @@ if __name__ == "__main__":
     
     if config.checkpoint_folder == None:
         config.checkpoint_folder = os.path.basename(args.config)[:-4] # copies filename of yml file, without the .yml extension
+    
+
     # LOADING DATASET
+
+    if config.dataset == "ogbg_ppa":
+        config.evec_len = 300
+    elif config.dataset == "zinc":
+        config.evec_len = 40
     
     data_dict_emb, train_loader, val_loader, test_loader = load_data(config)
 
-    # device = "cpu"
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    if config.cuda:
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    else: 
+        device = "cpu"
+
+    print(f"using: {device}")
 
     assert(len(data_dict_emb.keys()) > 0)
 
