@@ -9,7 +9,7 @@ parser = ArgumentParser()
 parser.add_argument('--config', type=str, nargs = '?', default='config_default.yml') # CONFIG FILE, OVERRIDES EVERYTHING BELOW 
 
 # MODEL ARCHITECTURE (some of these are not currently active)
-parser.add_argument("--model", type=str, choices=["GCN", 'GIN', 'GIN2', 'MLP', 'harmonic'], default='MLP')
+parser.add_argument("--model", type=str, choices=["GCN", 'GIN', 'GIN2', 'MLP', 'MLP2', 'harmonic'], default='MLP')
 
 parser.add_argument("--hidden_dim", type=int, default=30)
 parser.add_argument("--dropout", type=float, default=0.5)

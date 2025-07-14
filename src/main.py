@@ -1,6 +1,7 @@
 import sys
 sys.path.append("models/")
 from mlp import MLP
+from mlp2 import MLP2
 from GCN import GCN
 from GIN import GIN
 from GIN import GIN2
@@ -73,6 +74,9 @@ if __name__ == "__main__":
         model_config = config.RecurrentGIN_params
         model = RecurrentGIN(model_config.num_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, model_config.global_dim, model_config.dropout, True, "Sum", device).to(device) # TODO: make these hyperparams configurable in command line
     elif config.model == "MLP":
+        model = MLP(8, input_size, 60, config.num_eigenvectors).to(device)
+    elif config.model == "MLP2":
+        model = MLP2(8, input_size, 60, config.num_eigenvectors, config.dropout).to(device)
         model_config = config.MLP_params
         model = MLP(model_config.num_layers, input_size, model_config.hidden_dim, config.num_eigenvectors).to(device)
     elif config.model == "GlobalGIN":
