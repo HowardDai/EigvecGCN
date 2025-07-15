@@ -7,7 +7,7 @@ from attention_unit import SGUnit
 
 
 ###MLP with lienar output
-class MLP(nn.Module):
+class AttentionMLP(nn.Module):
     def __init__(self, num_layers, input_dim, hidden_dim, output_dim):
         '''
             num_layers: number of layers in the neural networks (EXCLUDING the input layer). If num_layers=1, this reduces to linear model.

@@ -9,12 +9,13 @@ from mlp import MLP
 from torch_geometric.nn import global_add_pool
 
 from torch.nn.utils.rnn import pad_sequence
+from MLP_attention import AttentionMLP
 
 
 
 
 class GlobalGIN(nn.Module):
-    def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim, output_dim, evec_len, final_dropout, learn_eps, neighbor_pooling_type, device):
+    def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim, output_dim, evec_len, final_dropout, learn_eps, neighbor_pooling_type, use_attention, device):
         '''
             num_layers: number of layers in the neural networks (INCLUDING the input layer)
             num_mlp_layers: number of layers in mlps (EXCLUDING the input layer)
@@ -35,6 +36,7 @@ class GlobalGIN(nn.Module):
         self.neighbor_pooling_type = neighbor_pooling_type
         self.learn_eps = learn_eps
         self.eps = nn.Parameter(torch.zeros(self.num_layers-1))
+        self.use_attention = use_attention
 
         ###List of MLPs
         self.mlps = torch.nn.ModuleList()
@@ -52,7 +54,10 @@ class GlobalGIN(nn.Module):
 
 
         self.evec_len = evec_len
-        self.final_mlp = MLP(2, evec_len * hidden_dim, evec_len * hidden_dim, evec_len * output_dim) # final layer, which processes concatenated node embeddings and outputs full eigenvector matrix
+        if self.use_attention:
+            self.final_mlp = AttentionMLP(2, evec_len * hidden_dim, evec_len * hidden_dim, evec_len * output_dim)
+        else:
+            self.final_mlp = MLP(2, evec_len * hidden_dim, evec_len * hidden_dim, evec_len * output_dim) # final layer, which processes concatenated node embeddings and outputs full eigenvector matrix
 
 
 

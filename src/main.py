@@ -77,7 +77,7 @@ if __name__ == "__main__":
         model = MLP(model_config.num_layers, input_size, model_config.hidden_dim, config.num_eigenvectors).to(device)
     elif config.model == "GlobalGIN":
         model_config = config.GlobalGIN_params
-        model = GlobalGIN(model_config.num_layers, model_config.num_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, config.evec_len, model_config.dropout, True, "Sum", device).to(device) 
+        model = GlobalGIN(model_config.num_layers, model_config.num_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, config.evec_len, model_config.dropout, True, "Sum", model_config.use_attention, device).to(device) 
     elif config.model == "harmonic":
         model = HarmonicAlgorithm(config.num_eigenvectors)
     else:
