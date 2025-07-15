@@ -6,7 +6,8 @@ from GCN import GCN
 from GIN import GIN
 from GIN import GIN2
 from GIN import RecurrentGIN 
-from GlobalGIN import GlobalGIN 
+from GlobalGIN import GlobalGIN
+from GlobalMLP import GlobalMLP
 
 from analytic import HarmonicAlgorithm, GroundTruth, LanczosAlgorithm, RandomVectors
 
@@ -15,6 +16,7 @@ from globals import args
 from training_evaluation import *
 from visualization import *
 from data import *
+from global_training import *
 
 import os
 
@@ -35,17 +37,7 @@ if __name__ == "__main__":
     if config.checkpoint_folder == None:
         config.checkpoint_folder = os.path.basename(args.config)[:-4] # copies filename of yml file, without the .yml extension
     
-
-    # LOADING DATASET
-
-    if config.dataset == "ogbg_ppa":
-        config.evec_len = 300
-    elif config.dataset == "zinc":
-        config.evec_len = 40
     
-    data_dict_emb, train_loader, val_loader, test_loader = load_data(config)
-
-
     if config.cuda:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     else: 
@@ -53,17 +45,35 @@ if __name__ == "__main__":
 
     print(f"using: {device}")
 
-    assert(len(data_dict_emb.keys()) > 0)
 
-    sample_set = data_dict_emb[next(iter(data_dict_emb))] # get one of train, valid, test, depending on what exists in the data_dict_emb
-    sample = sample_set[0] 
-    input_size = sample.x.shape[-1]
-    print("input_size", input_size)
+    # LOADING DATASET
+
+    if config.dataset == "ogbg_ppa":
+        config.evec_len = 300
+    elif config.dataset == "zinc":
+        config.evec_len = 40
+
+    
+
+    if config.model == "GlobalMLP":
+        train_loader, val_loader, test_loader = load_data_global(config)
+    else:
+        data_dict_emb, train_loader, val_loader, test_loader = load_data(config)
+        assert(len(data_dict_emb.keys()) > 0)
+
+        sample_set = data_dict_emb[next(iter(data_dict_emb))] # get one of train, valid, test, depending on what exists in the data_dict_emb
+        sample = sample_set[0] 
+        input_size = sample.x.shape[-1]
+        print("input_size", input_size)
+
     
     
     # if config.model == 'GCN':
         
     #     model = GCN(input_size, config.num_eigenvectors, config.dropout, config.use_bias).to(device)
+
+    if config.model == "GlobalMLP":
+        model = GlobalMLP().to(device)
     if config.model == "GIN":
         model_config = config.GIN_params
         model = GIN(model_config.num_layers, model_config.num_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, model_config.dropout, True, "Sum", device).to(device) 
@@ -81,7 +91,7 @@ if __name__ == "__main__":
         model = MLP2(model_config.num_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, model_config.dropout).to(device)
     elif config.model == "GlobalGIN":
         model_config = config.GlobalGIN_params
-        model = GlobalGIN(model_config.num_layers, model_config.num_mlp_layers, model_config.final_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, config.evec_len, model_config.dropout, True, "Sum", device).to(device) 
+        model = GlobalGIN(model_config.num_layers, model_config.num_mlp_layers, model_config.final_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, config.evec_len, model_config.dropout, True, "Sum", model_config.use_attention,  device).to(device) 
     elif config.model == "harmonic":
         model_config = config.harmonic_params
         if model_config.subspace_size == None:
@@ -121,7 +131,14 @@ if __name__ == "__main__":
 
     if config.train:
         print("training...")
+<<<<<<< HEAD
         training_loop(model, train_loader, val_loader, test_loader, optimizer, device, config)
+=======
+        if config.model == "GlobalMLP":
+            global_training_loop(model, train_loader, val_loader, optimizer, device, config)
+        else:
+            training_loop(model, train_loader, val_loader, optimizer, device, config)
+>>>>>>> 5e0c09c26106acaab547626fba9210b6241aec5b
 
     if config.test:
         print("testing...")
