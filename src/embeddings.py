@@ -213,7 +213,6 @@ def generate_wavelet_bank(data: Data, num_scales=10, lazy_parameter=0.5, abs_val
 # 2. For each of the two nodes, run wavelet transform with a starting signal as a dirac on that node, at variable scales
 # 3. 
 
-# UPDATED: just applying the wavelet to the uniform
 
 # WAVELET EMBEDDING
 # Fixed signal (1) x node-specific coordinate (2) 
@@ -225,12 +224,45 @@ def wavelet_emb(data: Data, num_scales=10, lazy_parameter=0.5):
     filters = generate_wavelet_bank(data, num_scales=10, lazy_parameter=0.5)
 
     embs = torch.zeros(N, num_scales)
+
     signal = torch.ones(N)
 
     for i in range(num_scales):
         embs[:, i] = filters[i] @ signal
         
     return embs
+
+
+# WAVELET POSITIONAL EMBEDDING (picks random nodes to draw diracs at)
+# Fixed signal (1) x node-specific coordinate (2) 
+def wavelet_positional_emb(data: Data, num_scales=10, lazy_parameter=0.5, num_nodes=3):
+    adj = data.edge_index
+    N = adj.size(0)
+
+    # 1) build your wavelet filters
+    filters = generate_wavelet_bank(data,
+                                    num_scales=num_scales,
+                                    lazy_parameter=lazy_parameter)
+
+    # 2) pick num_nodes distinct node‐indices
+    #    torch.randperm(N) gives a random permutation of [0..N-1]
+    indices = torch.randperm(N)[:num_nodes]  
+
+    # 3) build the (N x num_nodes) Dirac signal matrix
+    #    each column i is 1 at indices[i], else 0
+    signal = torch.zeros(N, num_nodes, device=adj.device)
+    signal[indices, torch.arange(num_nodes, device=adj.device)] = 1.
+
+    # 4) apply each filter to all diracs at once
+    #    results in an (N x num_nodes) matrix per scale
+    embs = []
+    for W in filters:
+        embs.append(W @ signal)   # shape: (N, num_nodes)
+    # now embs is a list of length num_scales, each an (N x num_nodes) tensor
+
+    # 5) stack or reshape as you like; for example:
+    #    a) return a tensor of shape (num_scales, N, num_nodes):
+    return torch.cat(embs, dim=1)
 
 def wavelet_moments_emb(data: Data, num_moments=4, num_scales=10, lazy_parameter=0.5):
     adj = data.edge_index

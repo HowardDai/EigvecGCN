@@ -14,7 +14,7 @@ from torch.nn.utils.rnn import pad_sequence
 
 
 class GlobalGIN(nn.Module):
-    def __init__(self, num_layers, num_mlp_layers, input_dim, hidden_dim, output_dim, evec_len, final_dropout, learn_eps, neighbor_pooling_type, device):
+    def __init__(self, num_layers, num_mlp_layers, final_mlp_layers, input_dim, hidden_dim, output_dim, evec_len, final_dropout, learn_eps, neighbor_pooling_type, device):
         '''
             num_layers: number of layers in the neural networks (INCLUDING the input layer)
             num_mlp_layers: number of layers in mlps (EXCLUDING the input layer)
@@ -52,7 +52,7 @@ class GlobalGIN(nn.Module):
 
 
         self.evec_len = evec_len
-        self.final_mlp = MLP(2, evec_len * hidden_dim, evec_len * hidden_dim, evec_len * output_dim) # final layer, which processes concatenated node embeddings and outputs full eigenvector matrix
+        self.final_mlp = MLP(final_mlp_layers, evec_len * hidden_dim, evec_len * hidden_dim, evec_len * output_dim) # final layer, which processes concatenated node embeddings and outputs full eigenvector matrix
 
 
 

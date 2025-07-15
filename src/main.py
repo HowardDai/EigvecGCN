@@ -8,7 +8,7 @@ from GIN import GIN2
 from GIN import RecurrentGIN 
 from GlobalGIN import GlobalGIN 
 
-from harmonic import HarmonicAlgorithm
+from analytic import HarmonicAlgorithm, GroundTruth, LanczosAlgorithm, RandomVectors
 
 from utils import *
 from globals import args
@@ -74,16 +74,28 @@ if __name__ == "__main__":
         model_config = config.RecurrentGIN_params
         model = RecurrentGIN(model_config.num_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, model_config.global_dim, model_config.dropout, True, "Sum", device).to(device) # TODO: make these hyperparams configurable in command line
     elif config.model == "MLP":
-        model = MLP(8, input_size, 60, config.num_eigenvectors).to(device)
-    elif config.model == "MLP2":
-        model = MLP2(8, input_size, 60, config.num_eigenvectors, config.dropout).to(device)
         model_config = config.MLP_params
         model = MLP(model_config.num_layers, input_size, model_config.hidden_dim, config.num_eigenvectors).to(device)
+    elif config.model == "MLP2":
+        model_config = config.MLP2_params
+        model = MLP2(model_config.num_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, model_config.dropout).to(device)
     elif config.model == "GlobalGIN":
         model_config = config.GlobalGIN_params
-        model = GlobalGIN(model_config.num_layers, model_config.num_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, config.evec_len, model_config.dropout, True, "Sum", device).to(device) 
+        model = GlobalGIN(model_config.num_layers, model_config.num_mlp_layers, model_config.final_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, config.evec_len, model_config.dropout, True, "Sum", device).to(device) 
     elif config.model == "harmonic":
-        model = HarmonicAlgorithm(config.num_eigenvectors)
+        model_config = config.harmonic_params
+        if model_config.subspace_size == None:
+            model_config.subspace_size = 2 * config.num_eigenvectors + 1
+        model = HarmonicAlgorithm(config.num_eigenvectors, model_config.subspace_size) 
+    elif config.model == "lanczos":
+        model_config = config.lanczos_params
+        if model_config.subspace_size == None:
+            model_config.subspace_size = 2 * config.num_eigenvectors + 1
+        model = LanczosAlgorithm(config.num_eigenvectors, model_config.subspace_size)
+    elif config.model == "ground_truth":
+        model = GroundTruth(config.num_eigenvectors)
+    elif config.model == "random_vectors":
+        model = RandomVectors(config.num_eigenvectors)
     else:
         print("Invalid model type")
     
@@ -96,7 +108,7 @@ if __name__ == "__main__":
     os.makedirs('checkpoints', exist_ok=True)
     os.makedirs(f"checkpoints/{config.checkpoint_folder}", exist_ok=True)
 
-    if config.train: # only need if training. This throws error if trying to use HarmonicAlgorithm for training 
+    if config.train: # only need if training. This throws error if trying to use an analytic method for training 
         optimizer = torch.optim.Adam(model.parameters(), lr=config.lr,
                                  weight_decay=config.weight_decay)
 
@@ -109,14 +121,15 @@ if __name__ == "__main__":
 
     if config.train:
         print("training...")
-        training_loop(model, train_loader, val_loader, optimizer, device, config)
+        training_loop(model, train_loader, val_loader, test_loader, optimizer, device, config)
 
     if config.test:
         print("testing...")
-        evaluate(model, test_loader, device, config)
+        evaluate(model, test_loader, device, config) # TODO: change to test_loader when ready for final analysis
+        if not config.forced_ortho:
+            evaluate(model, test_loader, device, config, extra_ortho_results=True)
 
-
-
+    
     # if not config.multiple_runs:
     #     print("Started training with 1 run.",
     #           f"Early stopping: {'Yes' if config.use_early_stopping else 'No'}")

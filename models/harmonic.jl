@@ -142,7 +142,9 @@ function solve_laplacians(L::AbstractMatrix, boundary::Vector{Dict{Int, Float64}
 end
 
 
-function get_schur_eigvec_approximations(M::AbstractMatrix{Float64}, subset_method)
+function get_schur_eigvec_approximations(M::AbstractMatrix{Float64}, min_subset_size, subset_method)
+    t1_overall = time()
+
     runtimes = Dict()
 
     M = sparse(M)
@@ -152,7 +154,7 @@ function get_schur_eigvec_approximations(M::AbstractMatrix{Float64}, subset_meth
     t1 = time() #
 
     if subset_method == "random_uniform_subset"
-        subset_indices = random_uniform_subset(M)
+        subset_indices = random_uniform_subset(M, min_count=min_subset_size)
     end
 
     
@@ -192,9 +194,11 @@ function get_schur_eigvec_approximations(M::AbstractMatrix{Float64}, subset_meth
 
     print(runtimes)
     flush(stdout)
+
+    t2_overall = time()
+    runtime = t2_overall - t1_overall 
     
-    return Array(eff_exts)
-  
+    return Array(eff_exts), runtime
   
 end
 
@@ -277,6 +281,7 @@ function get_schur_eigvec_approximations_timed(M::AbstractMatrix{Float64}, subse
   
   
 end
+
 
 function get_schur_eigvec_approximations_wrapper(M::AbstractMatrix{Float64}, subset_method)
     arg = M, subset_method

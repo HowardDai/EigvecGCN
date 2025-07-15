@@ -6,7 +6,10 @@
 cuda: true  # override if you wish to disable CUDA
 
 # MODEL ARCHITECTURE
-model: "GIN"               # choices: "GIN", "GIN2", "RecurrentGIN", "GlobalGIN", "MLP", "harmonic"
+model: "GIN"               
+# choices (trainable): "GIN", "GIN2", "RecurrentGIN", "GlobalGIN", "MLP", "MLP2", 
+# choices (analytic methods, do NOT train): harmonic", "lanczos", "ground_truth", "random_vectors"
+
 GIN_params:
   num_layers: 8
   num_mlp_layers: 3
@@ -24,14 +27,22 @@ RecurrentGIN_params:
   global_dim: 5
   dropout: 0.1 
 GlobalGIN_params: 
-  num_layers: 8
+  num_layers: 4
   num_mlp_layers: 3
+  final_mlp_layers: 5
   hidden_dim: 60
   dropout: 0.1 
 MLP_params:
   num_layers: 8
   hidden_dim: 60
-  dropout: 0.1 
+MLP2_params:
+  num_layers: 8
+  hidden_dim: 60
+  dropout: 0.1
+harmonic_params:
+  subspace_size: # Note: if left empty, will choose to be 2* num_eigenvectors
+lanczos_params:
+  subspace_size: # Note: if left empty, will choose to be 2* num_eigenvectors
 
 
 
@@ -61,6 +72,7 @@ lambda_ortho: 1
 diffusion_emb: false
 diffusion_row: false
 wavelet_emb: false
+wavelet_positional_emb: false
 scatter_emb: false
 global_scatter_emb: false
 invariance_transform: "none"   # choices: "none", "random", "forced_order"
@@ -81,7 +93,7 @@ checkpoint_folder: # Only change this if you want a custom folder name, otherwis
 load_model: null                # path to a saved model, or null
 
 # ACTIONS
-train: false
+train: false 
 test: false
 
 # DATA

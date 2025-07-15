@@ -5,6 +5,7 @@ import numpy as np
 import scipy.sparse as sparse
 from torch_geometric.utils import to_dense_adj
 
+
 from typing import List
 
 ##Geometric Scattering

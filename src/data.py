@@ -183,6 +183,7 @@ class DataEmbeddings:
 
         data.perms = []
         data.x = torch.ones(data.num_nodes, 0, dtype=torch.float32)
+        data.temp = torch.ones(data.num_nodes, 0, dtype=torch.float32)
 
         data.emb_runtimes = {}
 
@@ -198,6 +199,11 @@ class DataEmbeddings:
             t1 = time.time()
             data.x = torch.cat((data.x, wavelet_emb(data)), dim=-1)
             data.emb_runtimes['wavelet_emb'] = time.time() - t1
+        
+        if self.config.wavelet_positional_emb:
+            t1 = time.time()
+            data.x = torch.cat((data.x, wavelet_positional_emb(data)), dim=-1)
+            data.emb_runtimes['wavelet_positional_emb'] = time.time() - t1
 
         if self.config.scatter_emb:
             t1 = time.time()
@@ -228,7 +234,14 @@ class DataEmbeddings:
         t1 = time.time()
         # data.x = torch.cat((data.x, diffused_dirac_emb(data)), dim=-1)
         L, Q = torch.linalg.eigh(get_lap(data.edge_index)) # TEMPORARY, JUST FOR RUNTIME TESTING
+
+        data.x = torch.cat((data.x, L.unsqueeze(dim=-1)), dim=-1) # include concatenate operation for fair runtime comparison 
         data.emb_runtimes['eigh'] = time.time() - t1
+
+        # data.temp = torch.ones(data.num_nodes, 0, dtype=torch.float32) # clear out 
+
+
+        
 
         # t1 = time.time()
         # # data.x = torch.cat((data.x, diffused_dirac_emb(data)), dim=-1)
@@ -548,7 +561,8 @@ def load_data(config):
         need_emb['valid'] = True
 
     if config.test:
-        need_emb['test'] = True
+        need_emb['valid'] = True
+        need_emb['test'] = True # TODO: change to just test_loader when ready for final analysis
 
 
     for key in data_dict:
@@ -597,8 +611,8 @@ def load_data(config):
         val_loader   = DataLoader(data_dict_emb['valid'], batch_size=64, shuffle=False)
     else:
         val_loader = None
-    if 'test' in data_dict_emb.keys():
-        test_loader  = DataLoader(data_dict_emb['test'],  batch_size=1, shuffle=False)
+    if 'valid' in data_dict_emb.keys():
+        test_loader  = DataLoader(data_dict_emb['valid'],  batch_size=1, shuffle=False) # TODO: CHANGE BACK TO TEST WHEN READY 
     else:
         test_loader = None
 

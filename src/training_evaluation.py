@@ -255,7 +255,7 @@ def validate(model, loader, optimizer, device, config):
     return total_loss, total_ortho_loss
 
 
-def training_loop(model, train_loader, val_loader, optimizer, device, config):
+def training_loop(model, train_loader, val_loader, test_loader, optimizer, device, config):
 
     # validation_acc = []
     validation_loss_hist = []
@@ -289,13 +289,10 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
                 torch.save(model.state_dict(), f"checkpoints/{config.checkpoint_folder}/{epoch}.pt")
                 best_val_loss = val_loss
 
-                out_dict = evaluate(model, val_loader, device, config)
-                fieldnames = list(out_dict.keys())
-                csv_file_name = f"plots/{config.checkpoint_folder}/metrics.csv"
-                with open(csv_file_name, 'w', newline='') as csvfile:
-                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                    writer.writeheader()
-                    writer.writerows([out_dict])
+                evaluate(model, test_loader, device, config) 
+                if not config.forced_ortho:
+                    evaluate(model, test_loader, device, config, extra_ortho_results=True)
+                
 
             if config.use_early_stopping:
                 if val_loss < last_min_val_loss:
@@ -324,7 +321,7 @@ def training_loop(model, train_loader, val_loader, optimizer, device, config):
     if not config.multiple_runs:
         print(f"Total training time: {t_end-t_start:.2f} seconds")
 
-    plot_results(config, model, device, val_loader, validation_loss_hist, train_loss_hist,)
+    plot_loss_history(validation_loss_hist, train_loss_hist, config)
 
     return validation_loss_hist
 
@@ -341,7 +338,11 @@ signal.signal(signal.SIGALRM, _timeout_handler)
 
 
 
-def evaluate(model, loader, device, config):
+def evaluate(model, loader, device, config, extra_ortho_results=False):
+    # NOTE: extra_ortho_results is used to force ortho on models which don't normally use forced_ortho (i.e. learned ortho), just to see how results would be if ortho was forced afterwards
+    
+    if extra_ortho_results:
+        print("Evaluating with additional forced orthogonality...")
     model.eval()
 
     total_loss = 0
@@ -359,20 +360,27 @@ def evaluate(model, loader, device, config):
 
     for idx, data in enumerate(tqdm(loader)):
         
-        print(data.num_nodes)
 
         
         data = data.to(device)
         t1 = time.time()
-        out = model(data.x, data.edge_index, data.batch).to(device) 
 
+        if config.model == "harmonic": # recording the runtime INSIDE julia, not including julia/python latency 
+            out, runtime = model(data.x, data.edge_index, data.batch)
+            out = out.to(device)
+        else:
+            out = model(data.x, data.edge_index, data.batch).to(device) 
         
 
-        if config.forced_ortho:
+        if config.forced_ortho or extra_ortho_results:
             out = orthogonalize_by_batch(out, data.batch)
 
         out = normalize_by_batch(out, data.batch)
-        total_runtime += time.time() - t1
+
+        if config.model == "harmonic":
+            total_runtime += runtime
+        else:
+            total_runtime += time.time() - t1
 
 
 
@@ -395,8 +403,18 @@ def evaluate(model, loader, device, config):
 
             loss_dict[loss_function] += loss.item()
 
+
+        
+
         total_eigval_sum += torch.sum(data.eigvals)
         total_num_eigvecs += num_eigvecs * (data.batch[-1]+1)
+
+        if idx % 100 == 0: # print one set of example eigvecs every 100 cases 
+            if extra_ortho_results:
+                tag = str(idx) + "_with_ortho"
+            else:
+                tag = str(idx)
+            plot_eigvecs(out, data.eigvecs[:, :config.num_eigenvectors], data.edge_index, tag, config)
     
 
     num_items = len(loader.dataset) 
@@ -413,9 +431,22 @@ def evaluate(model, loader, device, config):
     print(avg_runtime)
     out_dict = loss_dict
     out_dict['runtime'] = avg_runtime
+    out_dict['name'] = config.checkpoint_folder
     out_dict['dataset'] = config.dataset
+    
+    
 
-    plot_results(config, model, device, loader)
+    fieldnames = list(out_dict.keys())
+    if extra_ortho_results: 
+        csv_file_name = f"plots/{config.checkpoint_folder}/metrics_with_ortho.csv"
+    else:
+        csv_file_name = f"plots/{config.checkpoint_folder}/metrics.csv"
+    with open(csv_file_name, 'w', newline='') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows([out_dict])
+    
+
 
     return out_dict
     
