@@ -39,11 +39,16 @@ class GlobalEmbeddings():
 
         train_evec = self.compute_eigvec_tensor(self.train_set)
         val_evec = self.compute_eigvec_tensor(self.val_set)      
-        test_evec = self.compute_eigvec_tensor(self.test_set)                  
+        test_evec = self.compute_eigvec_tensor(self.test_set)
 
-        train_dataset = TensorDataset(train_emb, train_adj, train_eval, train_evec)
-        val_dataset =  TensorDataset(val_emb, val_adj, val_eval, val_evec)
-        test_dataset =  TensorDataset(test_emb, test_adj, test_eval, test_evec)
+        train_lap = self.compute_lap_tensor(self.train_set)
+        val_lap = self.compute_lap_tensor(self.val_set)      
+        test_lap = self.compute_lap_tensor(self.test_set)                  
+                
+
+        train_dataset = TensorDataset(train_emb, train_adj, train_eval, train_evec, train_lap)
+        val_dataset =  TensorDataset(val_emb, val_adj, val_eval, val_evec, val_lap)
+        test_dataset =  TensorDataset(test_emb, test_adj, test_eval, test_evec, test_lap)
         return train_dataset, val_dataset, test_dataset
 
 
@@ -213,18 +218,36 @@ class GlobalEmbeddings():
         target = torch.zeros((dataset.len(), self.config.num_eigenvectors, self.config.num_eigenvectors))
         for i in range(dataset.len()):
             data = dataset[i]
-             L = torch.diag(data.eigvals)
+            L = torch.diag(data.eigvals[:self.config.num_eigenvectors])
             target[i] = L
 
         return target
 
     def compute_eigvec_tensor(self, dataset):
-        target = torch.zeros((dataset.len(), self.config.eveclen, self.config.num_eigenvectors))
+        target = torch.zeros((dataset.len(), self.config.evec_len, self.config.num_eigenvectors))
         for i in range(dataset.len()):
             data = dataset[i]
-             U = data.eigvecs[:, :config.num_eigenvectors]
+            U = data.eigvecs[:self.config.evec_len, :self.config.num_eigenvectors]
             target[i] = U
 
+        return target
+
+
+    def compute_lap_tensor(self, dataset):
+        target = torch.zeros((dataset.len(), self.config.evec_len, self.config.evec_len))
+        for i in range(dataset.len()):
+            data = dataset[i]
+            adj = data.edge_index
+            N = data.num_nodes
+            padding_0 = 40-N
+
+            padding = (0, padding_0, 0, padding_0)
+
+            pad_adj = F.pad(adj.to_dense(), padding)
+            deg = torch.diag(torch.sum(pad_adj, dim=1))
+            L = deg - pad_adj
+
+            target[i] = L
         return target
 
 
