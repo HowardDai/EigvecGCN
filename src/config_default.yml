@@ -22,12 +22,13 @@ RecurrentGIN_params:
   num_mlp_layers: 3
   hidden_dim: 30
   global_dim: 5
-  dropout: 0.1 
+  dropout: 0.1
 GlobalGIN_params: 
   num_layers: 8
   num_mlp_layers: 3
   hidden_dim: 60
   dropout: 0.1 
+  use_attention: true
 MLP_params:
   num_layers: 8
   hidden_dim: 60
