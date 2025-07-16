@@ -37,7 +37,7 @@ if __name__ == "__main__":
     if config.checkpoint_folder == None:
         config.checkpoint_folder = os.path.basename(args.config)[:-4] # copies filename of yml file, without the .yml extension
     
-    
+
     if config.cuda:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     else: 
@@ -131,14 +131,10 @@ if __name__ == "__main__":
 
     if config.train:
         print("training...")
-<<<<<<< HEAD
-        training_loop(model, train_loader, val_loader, test_loader, optimizer, device, config)
-=======
         if config.model == "GlobalMLP":
             global_training_loop(model, train_loader, val_loader, optimizer, device, config)
         else:
-            training_loop(model, train_loader, val_loader, optimizer, device, config)
->>>>>>> 5e0c09c26106acaab547626fba9210b6241aec5b
+            training_loop(model, train_loader, val_loader, test_loader, optimizer, device, config)
 
     if config.test:
         print("testing...")

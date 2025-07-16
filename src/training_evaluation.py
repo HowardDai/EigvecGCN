@@ -170,7 +170,7 @@ def compute_loss(config, out, data):
     if config.energy:
         loss += config.lambda_energy * EnergyLoss(out, data.edge_index) 
     if config.supervised_eigval:
-        loss += SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals, data.batch, config)
+        loss += config.lambda_supervised_eigval * SupervisedEigenvalueLoss(out, data.edge_index, data.eigvals, data.batch, config)
     if config.supervised_eigval_unweighted:
         loss += SupervisedEigenvalueLossUnweighted(out, data.edge_index, data.eigvals, data.batch, config)
     if config.supervised_mse:

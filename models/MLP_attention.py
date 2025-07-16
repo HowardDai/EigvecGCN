@@ -17,7 +17,7 @@ class AttentionMLP(nn.Module):
             device: which device to use
         '''
     
-        super(MLP, self).__init__()
+        super(AttentionMLP, self).__init__()
 
         self.linear_or_not = True #default is linear model
         self.num_layers = num_layers
@@ -47,7 +47,10 @@ class AttentionMLP(nn.Module):
         else:
             #If MLP
             h = x
+            h = self.initial_attention(h)
 
-            for layer in range(self.num_layers - 1):
-                h = F.relu((self.layers[layer](h)))
-            return self.layers[self.num_layers - 1](h)
+            for layer in range(0, 2* (self.num_layers - 2), 2):
+                h = (self.layers[layer](h))
+                h = F.relu(self.layers[layer+1](h))
+                
+            return self.layers[-1](h)
