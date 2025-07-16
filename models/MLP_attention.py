@@ -8,7 +8,7 @@ from attention_unit import SGUnit
 
 ###MLP with lienar output
 class AttentionMLP(nn.Module):
-    def __init__(self, num_layers, input_dim, hidden_dim, output_dim):
+    def __init__(self, num_layers, input_dim, hidden_dim, evec_len):
         '''
             num_layers: number of layers in the neural networks (EXCLUDING the input layer). If num_layers=1, this reduces to linear model.
             input_dim: dimensionality of input features
@@ -27,16 +27,16 @@ class AttentionMLP(nn.Module):
             raise ValueError("number of layers should be positive!")
         elif num_layers == 1:
             #Linear model
-            self.linear = nn.Linear(input_dim, output_dim)
+            self.linear = nn.Linear(input_dim, evec_len)
         else:
             #Multi-layer model
             self.linear_or_not = False
             self.layers = torch.nn.ModuleList()
         
             for layer in range(num_layers - 2):
-                self.layers.append(SGUnit(hidden_dim, hidden_dim))
+                self.layers.append(SGUnit(hidden_dim, hidden_dim, evec_len))
                 self.layers.append(nn.Linear(hidden_dim, hidden_dim))
-            self.layers.append(nn.Linear(hidden_dim, output_dim))
+            self.layers.append(nn.Linear(hidden_dim, evec_len))
 
     def forward(self, x, edge_index=None, batch=None):
 

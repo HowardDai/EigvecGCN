@@ -67,6 +67,10 @@ supervised_eigval_unweighted: false
 supervised_lap_reconstruction: false
 supervised_mse: false
 
+#WEIGHTS FOR MIXED LOSS FUNCTIONS
+energy_weight: 1
+eigval_weight: 1
+
 
 forced_ortho: false
 
@@ -77,7 +81,7 @@ lambda_ortho: 1
 # EMBEDDINGS
 diffusion_emb: false
 diffusion_row: false
-wavelet_emb: false
+wavelet_emb: true
 wavelet_positional_emb: false
 scatter_emb: false
 global_scatter_emb: false

@@ -55,7 +55,7 @@ class GlobalGIN(nn.Module):
 
         self.evec_len = evec_len
         if self.use_attention:
-            self.final_mlp = AttentionMLP(2, evec_len * hidden_dim, evec_len * hidden_dim, evec_len * output_dim)
+            self.final_mlp = AttentionMLP(2, hidden_dim, hidden_dim, output_dim)
         else:
             self.final_mlp = MLP(final_mlp_layers, evec_len * hidden_dim, evec_len * hidden_dim, evec_len * output_dim) # final layer, which processes concatenated node embeddings and outputs full eigenvector matrix
 
@@ -208,8 +208,11 @@ class GlobalGIN(nn.Module):
 
         # padded_h = pad_sequence(graphs, batch_first=True) # pad so there are effectively evec_len nodes 
         flattened_h = padded_h.view(batch_size, self.evec_len * h.shape[-1]) # (B, N*H) where N is the max node count, i.e. evec_len
-        padded_out = self.final_mlp(flattened_h).view(batch_size * self.evec_len, -1) # 
-
+        
+        if self.use_attention:
+            padded_out = self.final_mlp(padded_h)
+        else:
+            padded_out = self.final_mlp(flattened_h).view(batch_size * self.evec_len, -1) # 
 
         final_out = padded_out[pad_tracker.bool()] # FILTER BY PAD_TRACKER HERE
 
