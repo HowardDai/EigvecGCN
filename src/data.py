@@ -190,6 +190,7 @@ class DataEmbeddings:
         data.temp = torch.ones(data.num_nodes, 0, dtype=torch.float32)
 
         data.emb_runtimes = {}
+        filters = generate_wavelet_bank(data, num_scales=10, lazy_parameter=0.5, abs_val = False)
 
         if self.config.diffusion_emb: # PERM INVARIANCE REQUIRED 
             t1 = time.time()
@@ -201,37 +202,37 @@ class DataEmbeddings:
 
         if self.config.wavelet_emb:
             t1 = time.time()
-            data.x = torch.cat((data.x, wavelet_emb(data)), dim=-1)
+            data.x = torch.cat((data.x, wavelet_emb(data, filters)), dim=-1)
             data.emb_runtimes['wavelet_emb'] = time.time() - t1
         
         if self.config.wavelet_positional_emb:
             t1 = time.time()
-            data.x = torch.cat((data.x, wavelet_positional_emb(data)), dim=-1)
+            data.x = torch.cat((data.x, wavelet_positional_emb(data, filters)), dim=-1)
             data.emb_runtimes['wavelet_positional_emb'] = time.time() - t1
 
         if self.config.scatter_emb:
             t1 = time.time()
-            data.x = torch.cat((data.x, scatter_emb(data)), dim=-1)
+            data.x = torch.cat((data.x, scatter_emb(data, filters)), dim=-1)
             data.emb_runtimes['scatter_emb'] = time.time() - t1
 
         if self.config.global_scatter_emb:
             t1 = time.time()
-            data.x = torch.cat((data.x, global_scatter_emb(data)), dim=-1)
+            data.x = torch.cat((data.x, global_scatter_emb(data, filters)), dim=-1)
             data.emb_runtimes['global_scatter_emb'] = time.time() - t1
         
         if self.config.wavelet_moments_emb:
             t1 = time.time()
-            data.x = torch.cat((data.x, wavelet_moments_emb(data)), dim=-1)
+            data.x = torch.cat((data.x, wavelet_moments_emb(data, filters)), dim=-1)
             data.emb_runtimes['wavelet_moments_emb'] = time.time() - t1
 
         if self.config.neighbor_bump_emb:
             t1 = time.time()
-            data.x = torch.cat((data.x, neighbors_signal_emb(data)), dim=-1)
+            data.x = torch.cat((data.x, neighbors_signal_emb(data, filters)), dim=-1)
             data.emb_runtimes['neighbor_bump_emb'] = time.time() - t1
 
         if self.config.diffused_dirac_emb:
             t1 = time.time()
-            data.x = torch.cat((data.x, diffused_dirac_emb(data)), dim=-1)
+            data.x = torch.cat((data.x, diffused_dirac_emb(data, filters)), dim=-1)
             data.emb_runtimes['diffused_dirac_emb'] = time.time() - t1
         
         

@@ -123,26 +123,25 @@ def degree_node_selection(adj: torch.sparse_coo_tensor, k, largest=True):
 
 # SCATTER EMBEDDING 
 # Fixed signal (1) x node-specific coordinate (2) 
-def scatter_emb(data, num_scales=5):
+def scatter_emb(data, filters, num_scales=5):
     wavelet_paths = all_index_combinations(num_scales)
     out = torch.zeros(data.num_nodes, 0, dtype=torch.float32)
     for i in range(len(wavelet_paths)):
-        out = torch.cat((out, scattering_transform(data,wavelet_inds = wavelet_paths[i])), dim=-1)
+        out = torch.cat((out, scattering_transform(data, filters, wavelet_inds = wavelet_paths[i])), dim=-1)
     return out
 
 
 # GLOBAL SCATTER EMBEDDING
 # Node-specific signal (2) x aggregate (1)
-def global_scatter_emb(data, num_scales=5):
+def global_scatter_emb(data, filters, num_scales=5):
     wavelet_paths = all_index_combinations(num_scales)
     out = torch.zeros(data.num_nodes, 0, dtype=torch.float32)
     for i in range(len(wavelet_paths)):
-        out = torch.cat((out, global_scattering_transform(data,wavelet_inds = wavelet_paths[i])), dim=-1)
+        out = torch.cat((out, global_scattering_transform(data,filters, wavelet_inds = wavelet_paths[i])), dim=-1)
     return out
 
-
-def scattering_transform(data: Data, num_scales=5, lazy_parameter=0.5, wavelet_inds=[]):
-    filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
+def scattering_transform(data: Data, filters, num_scales=5, lazy_parameter=0.5, wavelet_inds=[]):
+    filters = filters[:num_scales]
     
     if len(wavelet_inds) != 0:
         filters = [filters[i] for i in wavelet_inds]
@@ -157,8 +156,8 @@ def scattering_transform(data: Data, num_scales=5, lazy_parameter=0.5, wavelet_i
 
     return U.unsqueeze(dim=-1) # because there is only 1 signal in this case, edit this if more 
 
-def global_scattering_transform(data: Data, num_scales=10, lazy_parameter=0.5, num_moments=5, wavelet_inds=[]):
-    filters = generate_wavelet_bank(data, num_scales, lazy_parameter, abs_val = False)
+def global_scattering_transform(data: Data, filters, num_scales=10, lazy_parameter=0.5, num_moments=5, wavelet_inds=[]):
+    filters = filters[:num_scales]
 
     if len(wavelet_inds) != 0:
         
@@ -219,12 +218,12 @@ def generate_wavelet_bank(data: Data, num_scales=10, lazy_parameter=0.5, abs_val
 
 # WAVELET EMBEDDING
 # Fixed signal (1) x node-specific coordinate (2) 
-def wavelet_emb(data: Data, num_scales=10, lazy_parameter=0.5):
+def wavelet_emb(data: Data, filters, num_scales=10, lazy_parameter=0.5):
 
     adj = data.edge_index
     N = adj.size(0)
 
-    filters = generate_wavelet_bank(data, num_scales=10, lazy_parameter=0.5)
+    filters = filters[:num_scales]
 
     embs = torch.zeros(N, num_scales)
 
@@ -238,14 +237,12 @@ def wavelet_emb(data: Data, num_scales=10, lazy_parameter=0.5):
 
 # WAVELET POSITIONAL EMBEDDING (picks random nodes to draw diracs at)
 # Fixed signal (1) x node-specific coordinate (2) 
-def wavelet_positional_emb(data: Data, num_scales=10, lazy_parameter=0.5, num_nodes=3):
+def wavelet_positional_emb(data: Data, filters, num_scales=10, lazy_parameter=0.5, num_nodes=3):
     adj = data.edge_index
     N = adj.size(0)
 
     # 1) build your wavelet filters
-    filters = generate_wavelet_bank(data,
-                                    num_scales=num_scales,
-                                    lazy_parameter=lazy_parameter)
+    filters = filters[:num_scales]
 
     # 2) pick num_nodes distinct node‐indices
     #    torch.randperm(N) gives a random permutation of [0..N-1]
@@ -267,11 +264,11 @@ def wavelet_positional_emb(data: Data, num_scales=10, lazy_parameter=0.5, num_no
     #    a) return a tensor of shape (num_scales, N, num_nodes):
     return torch.cat(embs, dim=1)
 
-def wavelet_moments_emb(data: Data, num_moments=4, num_scales=10, lazy_parameter=0.5):
+def wavelet_moments_emb(data: Data, filters, num_moments=4, num_scales=10, lazy_parameter=0.5):
     adj = data.edge_index
     N = adj.size(0)
 
-    filters = generate_wavelet_bank(data, num_scales=10, lazy_parameter=0.5)
+    filters = filters[:num_scales]
     signal = torch.ones(N)
 
     embs = torch.zeros(N, num_scales * num_moments)
@@ -285,11 +282,11 @@ def wavelet_moments_emb(data: Data, num_moments=4, num_scales=10, lazy_parameter
 
 # NEIGHBORS SIGNAL EMBEDDING
 # Node-specific signal (2) x node-specific signal (2)
-def neighbors_signal_emb(data: Data, num_scales=10, lazy_parameter=0.5):
+def neighbors_signal_emb(data: Data, filters, num_scales=10, lazy_parameter=0.5):
     adj = data.edge_index
     N = adj.size(0)
 
-    filters = generate_wavelet_bank(data, num_scales=10, lazy_parameter=0.5)
+    filters = filters[:num_scales]
     signal = torch.ones(N)
 
     embs = torch.zeros(N, num_scales)
@@ -304,11 +301,11 @@ def neighbors_signal_emb(data: Data, num_scales=10, lazy_parameter=0.5):
 
 
 
-def diffused_dirac_emb(data: Data, num_scales=10, lazy_parameter=0.5):
+def diffused_dirac_emb(data: Data, filters, num_scales=10, lazy_parameter=0.5):
     adj = data.edge_index
     N = adj.size(0)
 
-    filters = generate_wavelet_bank(data, num_scales=10, lazy_parameter=0.5)
+    filters = filters[:num_scales]
     signal = torch.zeros(N)
 
     embs = torch.zeros(N, num_scales)
