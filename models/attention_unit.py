@@ -4,9 +4,10 @@ import torch.nn.functional as F
 
 
 class SGUnit(nn.Module):
-    def __init__(self, input_dim, output_dim):
+    def __init__(self, input_dim, output_dim, evec_len):
         super(SGUnit, self).__init__()
-        self.projection_1 = nn.Linear(input_dim, input_dim)
+        self.U = nn.Linear(input_dim, evec_len)
+        self.V = nn.Lineat(evec_len, input_dim)
         self.SGLayer = nn.Linear(input_dim, input_dim)
         torch.nn.init.zeros_(SGLayer.weight)
         torch.nn.init.ones_(SGLayer.bias)
@@ -15,11 +16,11 @@ class SGUnit(nn.Module):
 
 
     def forward(self, x):
-        z = self.projection_1(x)
+        z = self.U(x)
         z = F.gelu(z)
-        s = self.SGLayer(z)
+        s = self.SGLayer.weights @ z + self.SGLayer.bias
         s = s * z
-        y = self.projection_2(s)
+        y = self.V(s)
         y = y + x
         out = self.embed(y)
         out = F.gelu(out)
