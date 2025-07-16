@@ -74,9 +74,9 @@ def run_model(model, loader, optimizer, device, config, train):
         if config.forced_ortho:
             out = forced_ortho(out)
         if config.energy:
-            loss = energy_loss(out, lap)
+            loss += config.energry_weight * energy_loss(out, lap)
         elif config.supervised_eigval:
-            loss = eigval_loss(out, lap, evals)
+            loss += config.eigval_weight * eigval_loss(out, lap, evals)
 
         if train:
             optimizer.zero_grad()
