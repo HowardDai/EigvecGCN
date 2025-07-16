@@ -55,7 +55,7 @@ class GlobalGIN(nn.Module):
 
         self.evec_len = evec_len
         if self.use_attention:
-            self.final_mlp = AttentionMLP(2, hidden_dim, hidden_dim, output_dim)
+            self.final_mlp = AttentionMLP(2, hidden_dim, hidden_dim, self.evec_len)
         else:
             self.final_mlp = MLP(final_mlp_layers, evec_len * hidden_dim, evec_len * hidden_dim, evec_len * output_dim) # final layer, which processes concatenated node embeddings and outputs full eigenvector matrix
 
