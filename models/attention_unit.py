@@ -16,6 +16,7 @@ class SGUnit(nn.Module):
         z = self.projection_1(x)
         z = F.gelu(z)
         s = self.SGLayer(z)
+        s = s * z
         y = self.projection_2(s)
         y = y + x
         out = self.embed(y)
