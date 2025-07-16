@@ -357,9 +357,11 @@ def evaluate(model, loader, device, config, extra_ortho_results=False):
 
     num_eigvecs = config.num_eigenvectors
 
+    emb_dim = 0
 
     for idx, data in enumerate(tqdm(loader)):
-        
+        if idx == 0:
+            emb_dim = data.x.shape[-1]
 
         
         data = data.to(device)
@@ -430,10 +432,11 @@ def evaluate(model, loader, device, config, extra_ortho_results=False):
     avg_runtime = total_runtime / num_items
     print(avg_runtime)
     out_dict = loss_dict
+    out_dict['emb_dim'] = emb_dim
     out_dict['runtime'] = avg_runtime
     out_dict['name'] = config.checkpoint_folder
     out_dict['dataset'] = config.dataset
-    
+
     
 
     fieldnames = list(out_dict.keys())

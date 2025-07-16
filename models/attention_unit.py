@@ -8,8 +8,8 @@ class SGUnit(nn.Module):
         super(SGUnit, self).__init__()
         self.projection_1 = nn.Linear(input_dim, input_dim)
         self.SGLayer = nn.Linear(input_dim, input_dim)
-        torch.nn.init.zeros_(SGLayer.weight)
-        torch.nn.init.ones_(SGLayer.bias)
+        torch.nn.init.zeros_(self.SGLayer.weight)
+        torch.nn.init.ones_(self.SGLayer.bias)
         self.projection_2 = nn.Linear(input_dim, input_dim)
         self.embed = nn.Linear(input_dim, output_dim)
 

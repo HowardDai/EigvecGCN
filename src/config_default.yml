@@ -44,6 +44,8 @@ harmonic_params:
   subspace_size: # Note: if left empty, will choose to be 2* num_eigenvectors
 lanczos_params:
   subspace_size: # Note: if left empty, will choose to be 2* num_eigenvectors
+random_params:
+  num_samples: 1000
 
 
 
