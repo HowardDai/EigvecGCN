@@ -6,7 +6,7 @@
 cuda: true  # override if you wish to disable CUDA
 
 # MODEL ARCHITECTURE
-model: "GIN"               
+model: "GlobalGIN"               
 # choices (trainable): "GIN", "GIN2", "RecurrentGIN", "GlobalGIN", "MLP", "MLP2", "GlobalMLP"
 # choices (analytic methods, do NOT train): harmonic", "lanczos", "ground_truth", "random_vectors"
 
@@ -59,15 +59,12 @@ num_of_runs: 100
 follow_paper: true
 
 # LOSS FUNCTIONS
-energy: false
-supervised_eigval: false
+energy: true
+supervised_eigval: true
 supervised_eigval_unweighted: false
 supervised_lap_reconstruction: false
 supervised_mse: false
 
-#WEIGHTS FOR MIXED LOSS FUNCTIONS
-energy_weight: 1
-eigval_weight: 1
 
 
 forced_ortho: false
@@ -77,9 +74,9 @@ lambda_supervised_eigval: 2
 lambda_ortho: 1
 
 # EMBEDDINGS
-diffusion_emb: false
+diffusion_emb: true
 diffusion_row: false
-wavelet_emb: true
+wavelet_emb: false
 wavelet_positional_emb: false
 scatter_emb: false
 global_scatter_emb: false
@@ -89,11 +86,11 @@ neighbor_bump_emb: false
 diffused_dirac_emb: false
 
 # DATASET LOADING: preprocessing (delete "processed" folder to recompute from scratch if you are changing settings)
-use_supervised: false
+use_supervised: true
 use_largest_connected_components: true
 
 # DATASET LOADING: per-run
-use_mini_dataset: 1.0
+use_mini_dataset: 1
 
 # MODEL LOAD / SAVE PATHS
 checkpoint_folder: # Only change this if you want a custom folder name, otherwise defaults to match the name of this config file
@@ -101,10 +98,11 @@ checkpoint_folder: # Only change this if you want a custom folder name, otherwis
 load_model: null                # path to a saved model, or null
 
 # ACTIONS
-train: false 
+train: true 
 test: false
 
 # DATA
-dataset: "ogbg_ppa"            # choices: "ogbg_ppa", "zinc"
-num_eigenvectors: 30
+dataset: "drugbank"            # choices: "ogbg_ppa", "zinc", "drugbank"
+num_eigenvectors: 2
+evec_len: 350
 

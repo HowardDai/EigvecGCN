@@ -56,27 +56,23 @@ def smiles_to_data(smiles):
     edge_index = torch.tensor(edge_list, dtype=torch.long).t().contiguous()
 
     data = Data(edge_index=edge_index)
+    data.num_nodes = mol.GetNumAtoms()
 
     return data
 
 
 class DrugBankDataset(InMemoryDataset):
-    def __init__(self, root, csv_path, transform=None, pre_transform=None):
+    def __init__(self, root, csv_path, transform=None, pre_transform=None, pre_filter=None):
         self.csv_path = csv_path
-        super(DrugBankDataset, self).__init__(root, transform, pre_transform)
+        super(DrugBankDataset, self).__init__(root, transform, pre_transform, pre_filter)
+        
         self.data, self.slices = torch.load(self.processed_paths[0])
-
-    @property
-    def raw_file_names(self):
-        print(os.path.basename("drugbank.csv"))
-        return [os.path.basename(self.csv_path)]
+        
 
     @property
     def processed_file_names(self):
-        return ['data.pt']
+        return ['drugbank.pt']
 
-    def download(self):
-        pass
 
     def process(self):
         df = pd.read_csv(self.csv_path)
@@ -85,14 +81,20 @@ class DrugBankDataset(InMemoryDataset):
         for _, row in df.iterrows():
             smiles = row['SMILES']
             data = smiles_to_data(smiles)
-            data_list.append(data)
+            if data.edge_index.shape[0] == 2:
+                data_list.append(data)
+
+
+        if self.pre_transform is not None:
+            data_list = [self.pre_transform(data) for data in data_list]
 
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
-    def get_idx_split(dataset, train_ratio=0.8, valid_ratio=0.1, test_ratio=0.1, seed=42):
 
-        num_graphs = len(dataset)
+    def get_idx_split_dg(self, train_ratio=0.8, valid_ratio=0.1, test_ratio=0.1, seed=42):
+
+        num_graphs = len(self)
         indices = np.arange(num_graphs)
 
         train_idx, temp_idx = train_test_split(indices, train_size=train_ratio, random_state=seed, shuffle=True)
@@ -171,7 +173,6 @@ class DataPreTransform:
             evals, evecs = get_padded_eigvecs(data.edge_index, self.config.evec_len)
             data.eigvecs = evecs 
             data.eigvals = evals
-
         return data
 
 
@@ -192,9 +193,11 @@ class DataEmbeddings:
         data.emb_runtimes = {}
         filters = generate_wavelet_bank(data, num_scales=10, lazy_parameter=0.5, abs_val = False)
 
+
         if self.config.diffusion_emb: # PERM INVARIANCE REQUIRED 
             t1 = time.time()
             l = data.x.shape[-1]
+            data.x = torch.zeros(data.num_nodes, 1)
             data.x = torch.cat((data.x, diffusion_emb(data)), dim=-1)
             r = data.x.shape[-1]
             data.perms.append([l, r])
@@ -463,14 +466,16 @@ def load_data(config):
         elif config.dataset == 'ogbg_ppa' or config.dataset == 'drugbank':
             if config.dataset == 'ogbg_ppa':
                 dataset = PygGraphPropPredDataset(root=data_root, name='ogbg-ppa', transform=None, pre_transform=pre_transform)
+                split_idx = dataset.get_idx_split()
             else:
-                dataset = DrugBankDataset(root=data_root, csv_path="/vast/palmer/pi/krishnaswamy_smita/nsn27/SUMRY/EigvecGCN/src/drugbank.csv", transform=None, pre_transform=pre_transform)
+                dataset = DrugBankDataset(root=data_root, csv_path="/vast/palmer/pi/krishnaswamy_smita/nsn27/SUMRY/EigvecGCN/data/raw/drugbank.csv", transform=None, pre_transform=pre_transform)
+                split_idx = dataset.get_idx_split_dg()
             print('data object loaded!')
 
             # sample = dataset[0]
             # print(sample)
 
-            split_idx = dataset.get_idx_split()
+            
 
 
             # sample a fraction of each split
@@ -526,7 +531,7 @@ def load_data(config):
                         cache_list.append(data.clone())
                 
                     data_dict_cache[key] = CustomGraphDataset(cache_list)
-
+                os.makedirs(data_path, exist_ok=True)
                 torch.save(data_dict_cache, os.path.join(data_path, f"mini_dataset_{subset_frac}.pt"))
                 print(f"Mini dataset saved: {os.path.join(data_path, f"mini_dataset_{subset_frac}.pt")}")
 
@@ -581,10 +586,6 @@ def load_data(config):
         embeddings = DataEmbeddings(config)
         runtimes_dict = {}
         for idx, data in enumerate(tqdm(data_dict[key])):
-            
-
-            
-            
             data = embeddings(data)
             modified_list.append(data)
 
@@ -609,7 +610,7 @@ def load_data(config):
     print("Embeddings processed!")
 
     if 'train' in data_dict_emb.keys():
-        train_loader = DataLoader(data_dict_emb['train'], batch_size=32, shuffle=True) # ISSUE: right now this is just concatenating everything in the batch, treating it lke a huge graph
+        train_loader = DataLoader(data_dict_emb['train'], batch_size=1, shuffle=True) # ISSUE: right now this is just concatenating everything in the batch, treating it lke a huge graph
     else:
         train_loader = None
     if 'valid' in data_dict_emb.keys():
