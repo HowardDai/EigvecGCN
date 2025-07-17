@@ -9,7 +9,7 @@ from mlp import MLP
 from torch_geometric.nn import global_add_pool
 
 from torch.nn.utils.rnn import pad_sequence
-from MLP_attention import AttentionMLP
+from gmlp import *
 
 
 
@@ -54,10 +54,10 @@ class GlobalGIN(nn.Module):
 
 
         self.evec_len = evec_len
-        if self.use_attention:
-            self.final_mlp = AttentionMLP(2, hidden_dim, hidden_dim, self.evec_len)
+        if not self.use_attention:
+             self.final_mlp = MLP(final_mlp_layers, evec_len * hidden_dim, evec_len * hidden_dim, evec_len * output_dim) # final layer, which processes concatenated node embeddings and outputs full eigenvector matrix
         else:
-            self.final_mlp = MLP(final_mlp_layers, evec_len * hidden_dim, evec_len * hidden_dim, evec_len * output_dim) # final layer, which processes concatenated node embeddings and outputs full eigenvector matrix
+            self.final_mlp = gMLP(hidden_dim, hidden_dim, evec_len, 4, output_dim, prob_0_L=[1, 0.5])
 
 
 
@@ -204,13 +204,16 @@ class GlobalGIN(nn.Module):
         for h_batch in h_batches:
             pad_tracker = torch.cat((pad_tracker, F.pad(torch.ones(h_batch.shape[0]).to(self.device), (0, self.evec_len - h_batch.shape[0]), value=0)), dim=0)
 
-            padded_h = torch.cat((padded_h, F.pad(h_batch, (0,0,self.evec_len - h_batch.shape[0], 0), value=0)), dim=0)
+            padded_h = torch.cat((padded_h, F.pad(h_batch, (0,0,0, self.evec_len - h_batch.shape[0]), value=0)), dim=0)
 
         # padded_h = pad_sequence(graphs, batch_first=True) # pad so there are effectively evec_len nodes 
         flattened_h = padded_h.view(batch_size, self.evec_len * h.shape[-1]) # (B, N*H) where N is the max node count, i.e. evec_len
         
         if self.use_attention:
-            padded_out = self.final_mlp(padded_h)
+            batched_h = padded_h.view(batch_size, self.evec_len, h.shape[-1])
+            batched_out = self.final_mlp(batched_h)
+            padded_out = batched_out.view(batch_size * self.evec_len, -1)
+
         else:
             padded_out = self.final_mlp(flattened_h).view(batch_size * self.evec_len, -1) # 
 
