@@ -36,7 +36,7 @@ def plot_phate(evecs_pred, evecs_gt, adj, idx_label, config):
 
 
             
-    fig_i.suptitle(f"First {config.num_eigenvectors} Eigenvectors")
+    fig_i.suptitle(f"First {config.num_eigenvectors} Eigenvectors on example {idx_label}. n = {evecs_gt.shape[0]}")
     # fig_i.legend(h, l)
     fig_i.savefig(f"plots/{config.checkpoint_folder}/eigvecs_PHATE_{idx_label}.png")
 
@@ -85,7 +85,8 @@ def plot_eigvecs(evecs_pred, evecs_gt, adj, idx_label, config):
             ax.set(title=f"Phi {k + 1}")
         h, l = ax.get_legend_handles_labels()
             
-    fig_i.suptitle(f"First {config.num_eigenvectors} Eigenvectors")
+    fig_i.suptitle(f"First {config.num_eigenvectors} Eigenvectors on example {idx_label}. n = {evecs_gt.shape[0]}")
+
     fig_i.legend(h, l)
     fig_i.savefig(f"plots/{config.checkpoint_folder}/eigvecs_{idx_label}.png")
 

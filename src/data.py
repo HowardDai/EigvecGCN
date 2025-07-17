@@ -242,9 +242,7 @@ class DataEmbeddings:
         t1 = time.time()
         # data.x = torch.cat((data.x, diffused_dirac_emb(data)), dim=-1)
         L, Q = torch.linalg.eigh(get_lap(data.edge_index)) # TEMPORARY, JUST FOR RUNTIME TESTING
-
-        data.x = torch.cat((data.x, L.unsqueeze(dim=-1)), dim=-1) # include concatenate operation for fair runtime comparison 
-        data.emb_runtimes['eigh'] = time.time() - t1
+        data.emb_runtimes['eigh'] = time.time() - t1 
 
         # data.temp = torch.ones(data.num_nodes, 0, dtype=torch.float32) # clear out 
 

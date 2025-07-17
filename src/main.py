@@ -16,7 +16,7 @@ from globals import args
 from training_evaluation import *
 from visualization import *
 from data import *
-from global_training import *
+from global_training import global_training_loop
 
 import os
 
@@ -25,11 +25,16 @@ import yaml
 
 
 
+
 if __name__ == "__main__":
-    config = {}
+    user_config = {}
     with open(args.config, 'r') as f:
-        config = EasyDict(yaml.safe_load(f))
+        user_config = EasyDict(yaml.safe_load(f))
     
+    with open('src/config_default.yml', 'r') as f:
+        default_config = EasyDict(yaml.safe_load(f))
+
+    config = merge_configs(default_config, user_config)
 
     if config.load_model != None:
         assert(os.path.exists(config.load_model))
@@ -138,9 +143,36 @@ if __name__ == "__main__":
 
     if config.test:
         print("testing...")
-        evaluate(model, test_loader, device, config) # TODO: change to test_loader when ready for final analysis
-        if not config.forced_ortho:
-            evaluate(model, test_loader, device, config, extra_ortho_results=True)
+        if config.model == "random_vectors": # if random, compile num_samples number of tests
+
+            model_config = config.random_params
+            results_dict_list = []
+            results_dict_list_ortho = []
+            for i in range(model_config.num_samples):
+                results_dict = evaluate(model, val_loader, device, config) # using val_loader here because random model can handle batch_size > 1, making it faster
+                results_dict_list.append(results_dict)
+
+                if not config.forced_ortho:
+                    results_dict_ortho = evaluate(model, val_loader, device, config, extra_ortho_results=True)
+                    results_dict_list_ortho.append(results_dict_ortho)
+                
+            final_df = pd.DataFrame(results_dict_list)
+
+            csv_file_name = f"plots/{config.checkpoint_folder}/metrics.csv"
+            final_df.to_csv(csv_file_name)
+
+            if not config.forced_ortho:
+                final_df_ortho = pd.DataFrame(results_dict_list)
+                csv_file_name_ortho = f"plots/{config.checkpoint_folder}/metrics_with_ortho.csv"
+                final_df_ortho.to_csv(csv_file_name_ortho)
+
+
+        else:
+            evaluate(model, test_loader, device, config) # note: currently test_loader has val set, change to test set when ready 
+            
+            if not config.forced_ortho:
+                evaluate(model, test_loader, device, config, extra_ortho_results=True)
+        
 
     
     # if not config.multiple_runs:

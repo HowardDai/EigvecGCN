@@ -6,6 +6,10 @@ from torch_geometric.utils import to_dense_adj
 
 from typing import List
 
+
+from easydict import EasyDict
+import yaml
+
 ##Geometric Scattering
 
 # for generating all possible wavelet combinations 
@@ -126,3 +130,22 @@ def convert_scipy_to_torch_sparse(matrix):
     shape = torch.Size(matrix_helper_coo.shape)
     matrix = torch.sparse.FloatTensor(indices, data, shape)
     return matrix
+
+
+def merge_configs(default: EasyDict, override: EasyDict) -> EasyDict:
+    """
+    For each key in override, if both default[k] and override[k]
+    are dict‑like, recurse; otherwise take override[k].
+    """
+    for k, v in override.items():
+        if (
+            k in default
+            and isinstance(default[k], EasyDict)
+            and isinstance(v, dict)
+        ):
+            # recurse into nested EasyDict
+            default[k] = merge_configs(default[k], EasyDict(v))
+        else:
+            # override or add new key
+            default[k] = v
+    return default
