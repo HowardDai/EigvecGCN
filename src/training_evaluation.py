@@ -359,6 +359,9 @@ def evaluate(model, loader, device, config, extra_ortho_results=False):
 
     emb_dim = 0
 
+    num_err_runs = 0 # number of instances where convergence fails
+    num_filled_vectors = 0 # number of instances where random vectors are inserted in place of failed convergence 
+
     for idx, data in enumerate(tqdm(loader)):
         if idx == 0:
             emb_dim = data.x.shape[-1]
@@ -370,6 +373,12 @@ def evaluate(model, loader, device, config, extra_ortho_results=False):
         if config.model == "harmonic": # recording the runtime INSIDE julia, not including julia/python latency 
             out, runtime = model(data.x, data.edge_index, data.batch)
             out = out.to(device)
+        elif config.model == "lanczos":
+            out, success, pad_vecs_count = model(data.x, data.edge_index, data.batch)
+            out = out.to(device)
+            if not success:
+                num_err_runs += 1
+                num_filled_vectors += pad_vecs_count
         else:
             out = model(data.x, data.edge_index, data.batch).to(device) 
         
@@ -436,7 +445,10 @@ def evaluate(model, loader, device, config, extra_ortho_results=False):
     out_dict['runtime'] = avg_runtime
     out_dict['name'] = config.checkpoint_folder
     out_dict['dataset'] = config.dataset
-
+    out_dict['num_err_runs'] = num_err_runs
+    out_dict['num_filled_vectors'] = num_filled_vectors
+ 
+    
     
 
     fieldnames = list(out_dict.keys())

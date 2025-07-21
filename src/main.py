@@ -96,7 +96,7 @@ if __name__ == "__main__":
         model = MLP2(model_config.num_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, model_config.dropout).to(device)
     elif config.model == "GlobalGIN":
         model_config = config.GlobalGIN_params
-        model = GlobalGIN(model_config.num_layers, model_config.num_mlp_layers, model_config.final_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, config.evec_len, model_config.dropout, True, "Sum", model_config.use_attention,  device).to(device) 
+        model = GlobalGIN(model_config.num_layers, model_config.num_mlp_layers, model_config.final_mlp_layers, input_size, model_config.hidden_dim, config.num_eigenvectors, config.evec_len, model_config.dropout, True, "Sum", device, model_config.mlp_type).to(device) 
     elif config.model == "harmonic":
         model_config = config.harmonic_params
         if model_config.subspace_size == None:
@@ -149,11 +149,11 @@ if __name__ == "__main__":
             results_dict_list = []
             results_dict_list_ortho = []
             for i in range(model_config.num_samples):
-                results_dict = evaluate(model, val_loader, device, config) # using val_loader here because random model can handle batch_size > 1, making it faster
+                results_dict = evaluate(model, test_loader, device, config) # using val_loader here because random model can handle batch_size > 1, making it faster
                 results_dict_list.append(results_dict)
 
                 if not config.forced_ortho:
-                    results_dict_ortho = evaluate(model, val_loader, device, config, extra_ortho_results=True)
+                    results_dict_ortho = evaluate(model, test_loader, device, config, extra_ortho_results=True)
                     results_dict_list_ortho.append(results_dict_ortho)
                 
             final_df = pd.DataFrame(results_dict_list)
@@ -172,7 +172,7 @@ if __name__ == "__main__":
             
             if not config.forced_ortho:
                 evaluate(model, test_loader, device, config, extra_ortho_results=True)
-        
+    
 
     
     # if not config.multiple_runs:

@@ -49,7 +49,7 @@ class MLP2(nn.Module):
                 self.layer_norms.append(nn.LayerNorm((hidden_dim)))
                 self.dropouts.append(nn.Dropout(p=dropout))
 
-    def forward(self, x, edge_index, batch):
+    def forward(self, x, edge_index=None, batch=None):
         if self.linear_or_not:
             #If linear model
             return self.linear(x)

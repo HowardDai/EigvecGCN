@@ -23,7 +23,8 @@ from utils import *
 
 import scipy.sparse as sp
 
-from scipy.sparse.linalg import eigsh
+from scipy.sparse.linalg import eigsh, ArpackNoConvergence
+import warnings
 
 
 from julia import Main
@@ -78,9 +79,34 @@ class LanczosAlgorithm(nn.Module):
         adj = get_lap(edge_index).cpu().numpy()
         sparse_adj = sparse.csr_matrix(adj)
 
-        eigvals, eigvecs = eigsh(sparse_adj, k=self.output_dim, ncv=self.subspace_size)
-        eigvecs = torch.from_numpy(eigvecs)
-        return eigvecs[:, :]
+        success = True # whether or not Lanczos successfully converged
+        pad_vecs_count = 0 # number of vectors randomly filled (if not converged)
+
+
+        try:
+        # attempt to compute the k smallest eigenpairs
+            vals, vecs = eigsh(sparse_adj, k=self.output_dim, ncv=self.subspace_size, which='SM')
+            eigvecs = torch.from_numpy(vecs)
+        except ArpackNoConvergence as e:
+            # Warn, grab whatever converged, and keep going
+            warnings.warn(
+                f"ARPACK failed to converge for k={self.output_dim} ("
+                f"only {len(e.eigenvalues)} converged)",
+                RuntimeWarning
+            )
+            vals = e.eigenvalues
+            vecs = e.eigenvectors
+
+            eigvecs = torch.from_numpy(vecs)
+
+            pad_vecs_count = self.output_dim - vecs.shape[-1] 
+            random_pad = torch.rand(x.shape[0], pad_vecs_count).to(eigvecs.device)
+            eigvecs = torch.cat((eigvecs,random_pad), dim=-1)
+
+            success=False
+
+        return eigvecs[:, :], success, pad_vecs_count
+
 
 
 class RandomVectors(nn.Module):

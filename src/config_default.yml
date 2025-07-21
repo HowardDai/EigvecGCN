@@ -32,7 +32,7 @@ GlobalGIN_params:
   final_mlp_layers: 5
   hidden_dim: 60
   dropout: 0.1 
-  use_attention: true
+  mlp_type: "MLP"      # choices: "MLP", "MLP2", "AttentionMLP"
 MLP_params:
   num_layers: 8
   hidden_dim: 60
