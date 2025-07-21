@@ -21,7 +21,7 @@ class AttentionMLP(nn.Module):
 
         self.linear_or_not = True #default is linear model
         self.num_layers = num_layers
-        self.initial_attention = SGUnit(input_dim, hidden_dim)
+        self.initial_attention = SGUnit(input_dim, hidden_dim, evec_len)
 
         if num_layers < 1:
             raise ValueError("number of layers should be positive!")

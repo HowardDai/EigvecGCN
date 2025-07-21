@@ -58,10 +58,10 @@ def plot_eigvecs(evecs_pred, evecs_gt, adj, idx_label, config):
     evecs_pred = evecs_pred[sort_inds][:, evecs_inds].to_dense()
 
     # LINE PLOTS 
-    num_cols = math.ceil(config.num_eigenvectors / 2)
-    fig_i, axs = plt.subplots(num_cols, 2, figsize=(20, 45), sharex=True)
+    num_rows = max(math.ceil(config.num_eigenvectors / 2), 2)
+    fig_i, axs = plt.subplots(num_rows, 2, figsize=(20, 45), sharex=True)
     k = -1
-    for i in range(num_cols):
+    for i in range(num_rows):
         for j in [0, 1]:
             k += 1
             if k >= config.num_eigenvectors:
@@ -78,7 +78,7 @@ def plot_eigvecs(evecs_pred, evecs_gt, adj, idx_label, config):
             ax.plot(evecs_gt[:, k].cpu().detach().numpy(), color='tab:orange', label='ground truth')
             ax.set_ylim(-1, 1) # normalized
 
-            if i == num_cols - 1:
+            if i == num_rows - 1:
                 ax.set(xlabel='Vertex')
             if j == 0:
                 ax.set(ylabel='Eigenfunction')
