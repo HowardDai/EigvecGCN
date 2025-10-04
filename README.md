@@ -1,5 +1,5 @@
 # EigvecGCN
-Repository with experiments using GCNs to predict Laplacian eigenvectors. 
+Repository with initial experiments using GCNs to predict Laplacian eigenvectors. 
 
 ## Environment setup 
 
