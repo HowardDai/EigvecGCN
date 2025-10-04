@@ -91,8 +91,8 @@ diffused_dirac_emb: false
 use_supervised: true
 use_largest_connected_components: true
 
-# DATASET LOADING: per-run
-use_mini_dataset: 1
+# DATASET LOADING: per-run 
+use_mini_dataset: 1      # Proportion of full dataset to use 
 
 # MODEL LOAD / SAVE PATHS
 checkpoint_folder: # Only change this if you want a custom folder name, otherwise defaults to match the name of this config file

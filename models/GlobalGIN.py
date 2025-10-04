@@ -219,7 +219,7 @@ class GlobalGIN(nn.Module):
             batched_h = padded_h.view(batch_size, self.evec_len, h.shape[-1])
             batched_out = self.final_mlp(batched_h)
             padded_out = batched_out.view(batch_size * self.evec_len, -1)
-
+        
         else:
             padded_out = self.final_mlp(flattened_h).view(batch_size * self.evec_len, -1) # 
 

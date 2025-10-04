@@ -235,6 +235,7 @@ def wavelet_emb(data: Data, filters, num_scales=10, lazy_parameter=0.5):
     return embs
 
 
+
 # WAVELET POSITIONAL EMBEDDING (picks random nodes to draw diracs at)
 # Fixed signal (1) x node-specific coordinate (2) 
 def wavelet_positional_emb(data: Data, filters, num_scales=10, lazy_parameter=0.5, num_nodes=3):
